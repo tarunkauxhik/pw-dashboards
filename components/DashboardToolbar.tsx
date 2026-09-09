@@ -9,6 +9,7 @@ import type { Period } from "@/lib/dateRanges";
 interface Props {
   sourceOptions: string[];
   defaultExcluded: string[];
+  showGrossNet?: boolean;
   children: (ctx: {
     period: Period;
     grossNet: GrossNet;
@@ -19,6 +20,7 @@ interface Props {
 export function DashboardToolbar({
   sourceOptions,
   defaultExcluded,
+  showGrossNet = true,
   children,
 }: Props) {
   const [periodKind, setPeriodKind] = useState<PeriodKind>("last30");
@@ -31,7 +33,7 @@ export function DashboardToolbar({
           : { kind: "thisMonth" },
     [periodKind],
   );
-  const [grossNet, setGrossNet] = useState<GrossNet>("gross");
+  const [grossNet, setGrossNet] = useState<GrossNet>("net");
   const initiallyExcluded = useMemo(
     () => new Set(sourceOptions.filter((s) => defaultExcluded.includes(s))),
     [sourceOptions, defaultExcluded],
@@ -54,7 +56,9 @@ export function DashboardToolbar({
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 bg-card/40 p-3">
         <PeriodSelector value={periodKind} onChange={setPeriodKind} />
         <div className="flex items-center gap-4">
-          <GrossNetToggle value={grossNet} onChange={setGrossNet} />
+          {showGrossNet && (
+            <GrossNetToggle value={grossNet} onChange={setGrossNet} />
+          )}
           <SourceMultiSelect
             options={sourceOptions}
             excluded={excludedSources}

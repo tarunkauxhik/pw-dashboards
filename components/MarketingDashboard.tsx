@@ -46,6 +46,7 @@ export function MarketingDashboard({ data, anchor }: Props) {
     <DashboardToolbar
       sourceOptions={sources}
       defaultExcluded={DEFAULT_EXCLUDED}
+      showGrossNet={false}
     >
       {(ctx) => {
         const range = resolvePeriod(ctx.period, anchor);

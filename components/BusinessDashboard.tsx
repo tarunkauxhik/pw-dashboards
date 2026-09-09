@@ -26,6 +26,7 @@ import {
 } from "@/lib/filters";
 import { priorPeriod, resolvePeriod } from "@/lib/dateRanges";
 import { deltaStr, inr, intFmt, pct } from "@/lib/format";
+import type { GrossNet } from "./GrossNetToggle";
 import type { OrderRow, SheetData } from "@/types/sheet";
 
 interface Props {
@@ -34,6 +35,7 @@ interface Props {
 }
 
 const DEFAULT_EXCLUDED = ["ADMIN", "PW_PLAN"];
+const GST_DIVISOR = 1.18;
 
 function distinctSources(orders: OrderRow[]): string[] {
   return [...new Set(orders.map((o) => o.source))].sort();
@@ -45,6 +47,20 @@ function applySourceFilter(
 ): OrderRow[] {
   if (includeSources.size === 0) return orders;
   return orders.filter((o) => includeSources.has(o.source));
+}
+
+function projectPrice(orders: OrderRow[], grossNet: GrossNet): OrderRow[] {
+  if (grossNet === "gross") return orders;
+  return orders.map((o) => ({
+    ...o,
+    price: o.price / GST_DIVISOR,
+  }));
+}
+
+function projectCollection(orders: OrderRow[], grossNet: GrossNet): number {
+  return grossNet === "gross"
+    ? grossCollection(orders)
+    : netCollection(orders);
 }
 
 export function BusinessDashboard({ data, anchor }: Props) {
@@ -59,23 +75,25 @@ export function BusinessDashboard({ data, anchor }: Props) {
         const range = resolvePeriod(ctx.period, anchor);
         const prior = priorPeriod(range);
 
-        const ordersRangeAll = byOrderDateRange(data.mb_orders, range);
-        const ordersRange = applySourceFilter(ordersRangeAll, ctx.includeSources);
-        const ordersPriorAll = byOrderDateRange(data.mb_orders, prior);
-        const ordersPrior = applySourceFilter(ordersPriorAll, ctx.includeSources);
+        const baseOrdersRange = applySourceFilter(
+          byOrderDateRange(data.mb_orders, range),
+          ctx.includeSources,
+        );
+        const baseOrdersPrior = applySourceFilter(
+          byOrderDateRange(data.mb_orders, prior),
+          ctx.includeSources,
+        );
+
+        const ordersRange = projectPrice(baseOrdersRange, ctx.grossNet);
+        const ordersPrior = projectPrice(baseOrdersPrior, ctx.grossNet);
+
         const signupsRange = byDateRange(data.mb_signups_daily, range);
         const signupsPrior = byDateRange(data.mb_signups_daily, prior);
         const afRange = byAfDateRange(data.af_daily, range);
         const afPrior = byAfDateRange(data.af_daily, prior);
 
-        const collection =
-          ctx.grossNet === "gross"
-            ? grossCollection(ordersRange)
-            : netCollection(ordersRange);
-        const priorCollection =
-          ctx.grossNet === "gross"
-            ? grossCollection(ordersPrior)
-            : netCollection(ordersPrior);
+        const collection = projectCollection(ordersRange, ctx.grossNet);
+        const priorCollection = projectCollection(ordersPrior, ctx.grossNet);
 
         const totalSignups = signupsRange.reduce((s, r) => s + r.signups, 0);
         const priorSignups = signupsPrior.reduce((s, r) => s + r.signups, 0);
@@ -86,14 +104,10 @@ export function BusinessDashboard({ data, anchor }: Props) {
         const payers = paidUsers(ordersRange);
         const priorPayers = paidUsers(ordersPrior);
 
-        const arpuVal =
-          payers === 0 ? 0 : grossCollection(ordersRange) / payers;
+        const arpuVal = payers === 0 ? 0 : collection / payers;
         const priorArpu =
-          priorPayers === 0 ? 0 : grossCollection(ordersPrior) / priorPayers;
+          priorPayers === 0 ? 0 : priorCollection / priorPayers;
 
-        // Conv uses period-filtered SIGNUPS vs period-filtered PAYERS.
-        // Conversion is intentionally based on orders that match the user's
-        // source selection (so the headline reflects what they see in Collection).
         const conv = conversionRate(
           ordersRange,
           data.mb_signups_daily,
@@ -108,13 +122,9 @@ export function BusinessDashboard({ data, anchor }: Props) {
         );
 
         const aov =
-          ordersRange.length === 0
-            ? 0
-            : grossCollection(ordersRange) / ordersRange.length;
+          ordersRange.length === 0 ? 0 : collection / ordersRange.length;
         const priorAov =
-          ordersPrior.length === 0
-            ? 0
-            : grossCollection(ordersPrior) / ordersPrior.length;
+          ordersPrior.length === 0 ? 0 : priorCollection / ordersPrior.length;
 
         return (
           <div className="space-y-6">
