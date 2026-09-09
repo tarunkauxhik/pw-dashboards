@@ -4,6 +4,7 @@ import {
   dayKey,
   distinctFYs,
   distinctMonths,
+  fiscalYearStartIst,
   fyEndDate,
   fyLabel,
   fyRange,
@@ -14,6 +15,7 @@ import {
   monthKey,
   priorPeriod,
   resolvePeriod,
+  shiftDateIst,
 } from "@/lib/dateRanges";
 import type { MetaRow } from "@/types/sheet";
 
@@ -206,5 +208,25 @@ describe("fyLabel / fyRange / distinctFYs / distinctMonths", () => {
       { order_date_ist: "2026-01-05" },
     ];
     expect(distinctMonths(rows)).toEqual(["2025-08", "2025-09", "2026-01"]);
+  });
+});
+
+// ── pw.live helpers (Dashboard 4) ────────────────────────────────────
+
+describe("fiscalYearStartIst", () => {
+  it("fiscal year starts 1 April, regardless of month", () => {
+    expect(fiscalYearStartIst("2026-04-01")).toBe("2026-04-01");
+    expect(fiscalYearStartIst("2026-12-31")).toBe("2026-04-01");
+    expect(fiscalYearStartIst("2026-01-01")).toBe("2025-04-01");
+    expect(fiscalYearStartIst("2026-03-31")).toBe("2025-04-01");
+  });
+});
+
+describe("shiftDateIst", () => {
+  it("shifts forward and backward across month boundaries", () => {
+    expect(shiftDateIst("2026-09-08", 0)).toBe("2026-09-08");
+    expect(shiftDateIst("2026-09-30", 1)).toBe("2026-10-01");
+    expect(shiftDateIst("2026-09-01", -1)).toBe("2026-08-31");
+    expect(shiftDateIst("2025-02-28", 1)).toBe("2025-03-01");
   });
 });

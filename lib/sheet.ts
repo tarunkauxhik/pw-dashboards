@@ -19,7 +19,10 @@ function isValidSheet(data: unknown): data is SheetData {
     Array.isArray(d.mb_buy_type) &&
     Array.isArray(d.mb_paid_user_attribution) &&
     Array.isArray(d.mb_push_daily) &&
-    Array.isArray(d.af_daily)
+    Array.isArray(d.af_daily) &&
+    Array.isArray(d.mb_pwlive_orders) &&
+    Array.isArray(d.mb_pwlive_funnel) &&
+    Array.isArray(d.mb_pwlive_qa)
   );
 }
 
@@ -98,7 +101,6 @@ async function fetchOnce(
 }
 
 // Page loads + background revalidation: Next.js in-memory data cache only.
-// 10 minutes of revalidation across warm lambda invocations.
 export async function fetchSheetCached(): Promise<SheetFetchResult> {
   return fetchOnce({ next: { revalidate: 600 } });
 }

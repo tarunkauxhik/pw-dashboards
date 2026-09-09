@@ -214,3 +214,22 @@ export function addDaysIst(iso: string, n: number): string {
   const dd = String(dt.getUTCDate()).padStart(2, "0");
   return `${yy}-${mm}-${dd}`;
 }
+
+// ── pw.live fiscal helpers (Dashboard 4) ─────────────────────────────
+
+/**
+ * PW's reporting convention is FY starting 1 April (Indian FY).
+ * Confirmed against an existing FY-targets tracker — see PRD §4 caveat
+ * before assuming calendar-year YTD instead.
+ */
+export function fiscalYearStartIst(todayIst: string): string {
+  const [y, m] = todayIst.split("-").map(Number);
+  const fyYear = m >= 4 ? y : y - 1;
+  return `${fyYear}-04-01`;
+}
+
+export function shiftDateIst(dateIst: string, days: number): string {
+  const d = new Date(dateIst + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}

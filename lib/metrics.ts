@@ -3,10 +3,15 @@ import type {
   AttributionRow,
   OrderRow,
   PushRow,
+  PwLiveFunnelRow,
+  PwLiveOrderRow,
   SignupRow,
 } from "@/types/sheet";
+import { fiscalYearStartIst, shiftDateIst } from "./dateRanges";
 
 const EXCLUDED_SOURCES = ["ADMIN", "PW_PLAN"];
+
+const PW_LIVE_GST = 1.18;
 
 export function filterRevenueOrders(
   orders: OrderRow[],
@@ -127,6 +132,9 @@ export function cac(orders: OrderRow[], afRows: AppsFlyerRow[]): number {
   return installs === 0 ? 0 : cost / installs;
 }
 
+/**
+ * Revenue by acquisition channel - requires the join described in Sec 4.
+ */
 export function revenueByChannel(
   orders: OrderRow[],
   attribution: AttributionRow[],
@@ -239,4 +247,121 @@ export function topCampaigns(
     }))
     .sort((a, b) => b[sortBy] - a[sortBy])
     .slice(0, limit);
+}
+
+// ── pw.live metrics (Dashboard 4) ────────────────────────────────────
+// Money source: mb_pwlive_orders.price — NOT gold_orders.source='PW_PLAN'.
+// The latter is a GyaanE-side access marker with fixed system prices
+// that don't match real checkout amounts. See PRD §1 Rule 1.
+
+export function pwLiveGross(orders: PwLiveOrderRow[]): number {
+  return orders.reduce((sum, o) => sum + (o.price ?? 0), 0);
+}
+
+export function pwLiveNet(orders: PwLiveOrderRow[]): number {
+  return pwLiveGross(orders) / PW_LIVE_GST;
+}
+
+export function pwLivePaidUsers(orders: PwLiveOrderRow[]): number {
+  return new Set(orders.map((o) => o.userid)).size;
+}
+
+export function pwLiveArpu(orders: PwLiveOrderRow[]): number {
+  const users = pwLivePaidUsers(orders);
+  return users === 0 ? 0 : pwLiveGross(orders) / users;
+}
+
+export function funnelTotals(
+  funnel: PwLiveFunnelRow[],
+  stage: "batch_description_view" | "order_page_view",
+): { totalViews: number; uniqueUsers: number } {
+  const rows = funnel.filter((r) => r.funnel_stage === stage);
+  return {
+    totalViews: rows.reduce((s, r) => s + r.total_views, 0),
+    uniqueUsers: rows.reduce((s, r) => s + r.unique_users, 0),
+  };
+}
+
+/**
+ * Per agreed formula: Total Paid Users ÷ Batch Listing (Description)
+ * Unique Users. The denominator is uniqueVisitors at the batch description
+ * page, summed across the same window as the orders.
+ */
+export function pwLiveConversionRate(
+  orders: PwLiveOrderRow[],
+  funnel: PwLiveFunnelRow[],
+  fromIso: string,
+  toIso: string,
+): number {
+  const payers = pwLivePaidUsers(orders);
+  const windowedFunnel = funnel.filter(
+    (r) =>
+      r.funnel_stage === "batch_description_view" &&
+      r.event_date_ist >= fromIso &&
+      r.event_date_ist <= toIso,
+  );
+  const uniqueUsers = windowedFunnel.reduce(
+    (s, r) => s + r.unique_users,
+    0,
+  );
+  return uniqueUsers === 0 ? 0 : payers / uniqueUsers;
+}
+
+// ── pw.live — per-batch period table ──────────────────────────────────
+
+export interface BatchPeriodStats {
+  batchName: string;
+  ytd: { paidUsers: number; netCollection: number };
+  mtd: { paidUsers: number; netCollection: number };
+  d1: { paidUsers: number; netCollection: number };
+  d2: { paidUsers: number; netCollection: number };
+  d3: { paidUsers: number; netCollection: number };
+}
+
+export function perBatchPeriodTable(
+  orders: PwLiveOrderRow[],
+  todayIst: string,
+): BatchPeriodStats[] {
+  const batches = [...new Set(orders.map((o) => o.batch_name))];
+  const fyStart = fiscalYearStartIst(todayIst);
+  const monthStart = todayIst.slice(0, 7) + "-01";
+  const d1 = shiftDateIst(todayIst, -1);
+  const d2 = shiftDateIst(todayIst, -2);
+  const d3 = shiftDateIst(todayIst, -3);
+
+  const statsFor = (rows: PwLiveOrderRow[]) => ({
+    paidUsers: pwLivePaidUsers(rows),
+    netCollection: pwLiveNet(rows),
+  });
+  const inRange = (rows: PwLiveOrderRow[], from: string, to: string) =>
+    rows.filter(
+      (o) => o.order_date_ist >= from && o.order_date_ist <= to,
+    );
+
+  return batches
+    .map((batchName) => {
+      const b = orders.filter((o) => o.batch_name === batchName);
+      return {
+        batchName,
+        ytd: statsFor(inRange(b, fyStart, todayIst)),
+        mtd: statsFor(inRange(b, monthStart, todayIst)),
+        d1: statsFor(inRange(b, d1, d1)),
+        d2: statsFor(inRange(b, d2, d2)),
+        d3: statsFor(inRange(b, d3, d3)),
+      };
+    })
+    .sort((a, b) => b.mtd.netCollection - a.mtd.netCollection);
+}
+
+// ── Trend section shared shape ───────────────────────────────────────
+
+/**
+ * Minimal row shape both Dashboard 1 (OrderRow) and pw.live
+ * (PwLiveOrderRow) can be projected into, so a single TrendSection
+ * renders either data source without forking.
+ */
+export interface TrendableRow {
+  order_date_ist: string;
+  userid: string;
+  price: number;
 }

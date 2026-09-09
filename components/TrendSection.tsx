@@ -23,8 +23,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { FormulaInfo } from "./FormulaInfo";
 import { inr, intFmt, pct } from "@/lib/format";
-import type { OrderRow } from "@/types/sheet";
-import { paidUsers } from "@/lib/metrics";
 import type { GrossNet } from "./GrossNetToggle";
 import {
   dayKey,
@@ -35,29 +33,41 @@ import {
 
 type Grouping = "month" | "week" | "day";
 
+export interface TrendableRow {
+  order_date_ist: string;
+  userid: string;
+  price: number;
+}
+
 interface Props {
   label: string;
   grouping: Grouping;
   range: DateRange;
-  orders: OrderRow[];
-  signupsForConversion: number;
+  rows: TrendableRow[];
   grossNet: GrossNet;
+  /**
+   * Absolute denominator for Conversion %.
+   * Omit (or pass 0) to hide the Conversion column.
+   */
+  conversionDenominator?: number;
+  /** Label shown on the Conversion column header. */
+  conversionLabel?: string;
 }
 
-function groupOrders(
-  orders: OrderRow[],
+function groupRows(
+  rows: TrendableRow[],
   grouping: Grouping,
-): Map<string, OrderRow[]> {
-  const map = new Map<string, OrderRow[]>();
-  for (const o of orders) {
+): Map<string, TrendableRow[]> {
+  const map = new Map<string, TrendableRow[]>();
+  for (const r of rows) {
     const key =
       grouping === "month"
-        ? monthKey(o.order_date_ist)
+        ? monthKey(r.order_date_ist)
         : grouping === "week"
-          ? isoWeekKey(o.order_date_ist)
-          : dayKey(o.order_date_ist);
+          ? isoWeekKey(r.order_date_ist)
+          : dayKey(r.order_date_ist);
     const arr = map.get(key) ?? [];
-    arr.push(o);
+    arr.push(r);
     map.set(key, arr);
   }
   return new Map([...map.entries()].sort());
@@ -77,28 +87,29 @@ function shortLabel(key: string, grouping: Grouping): string {
 }
 
 function collectionFor(
-  orders: OrderRow[],
+  rows: TrendableRow[],
   grossNet: GrossNet,
 ): number {
-  if (grossNet === "gross") {
-    return orders.reduce((s, o) => s + o.price, 0);
-  }
-  return orders.reduce((s, o) => s + o.price, 0) / 1.18;
+  const sum = rows.reduce((s, r) => s + r.price, 0);
+  return grossNet === "gross" ? sum : sum / 1.18;
 }
 
 export function TrendSection({
   label,
   grouping,
   range,
-  orders,
-  signupsForConversion,
+  rows,
   grossNet,
+  conversionDenominator,
+  conversionLabel = "Conv.",
 }: Props) {
-  const grouped = groupOrders(orders, grouping);
+  const grouped = groupRows(rows, grouping);
+  const showConv =
+    conversionDenominator !== undefined && conversionDenominator > 0;
 
-  const series = Array.from(grouped.entries()).map(([key, periodOrders]) => {
-    const collection = collectionFor(periodOrders, grossNet);
-    const payers = paidUsers(periodOrders);
+  const series = Array.from(grouped.entries()).map(([key, periodRows]) => {
+    const collection = collectionFor(periodRows, grossNet);
+    const payers = new Set(periodRows.map((r) => r.userid)).size;
     return {
       key,
       label: shortLabel(key, grouping),
@@ -106,7 +117,9 @@ export function TrendSection({
       arpu: payers === 0 ? 0 : collection / payers,
       payers,
       conversion:
-        signupsForConversion > 0 ? payers / signupsForConversion : 0,
+        showConv && conversionDenominator > 0
+          ? payers / conversionDenominator
+          : 0,
     };
   });
 
@@ -114,7 +127,7 @@ export function TrendSection({
     return (
       <Card>
         <CardHeader
-          action={<FormulaInfo formula="Σ order.price · /1.18 when Net" />}
+          action={<FormulaInfo formula="Σ row.price · /1.18 when Net" />}
         >
           <CardTitle>{label}</CardTitle>
         </CardHeader>
@@ -128,7 +141,7 @@ export function TrendSection({
   return (
     <Card>
       <CardHeader
-        action={<FormulaInfo formula="Σ order.price · /1.18 when Net" />}
+        action={<FormulaInfo formula="Σ row.price · /1.18 when Net" />}
       >
         <CardTitle>{label}</CardTitle>
       </CardHeader>
@@ -146,14 +159,20 @@ export function TrendSection({
               />
               <XAxis
                 dataKey="label"
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                tick={{
+                  fontSize: 11,
+                  fill: "hsl(var(--muted-foreground))",
+                }}
                 tickLine={false}
                 axisLine={false}
               />
               <YAxis
                 yAxisId="left"
                 tickFormatter={(v: number) => `₹${(v / 1000).toFixed(0)}k`}
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                tick={{
+                  fontSize: 11,
+                  fill: "hsl(var(--muted-foreground))",
+                }}
                 tickLine={false}
                 axisLine={false}
                 width={50}
@@ -161,7 +180,10 @@ export function TrendSection({
               <YAxis
                 yAxisId="right"
                 orientation="right"
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                tick={{
+                  fontSize: 11,
+                  fill: "hsl(var(--muted-foreground))",
+                }}
                 tickLine={false}
                 axisLine={false}
                 width={40}
@@ -213,7 +235,9 @@ export function TrendSection({
               <TableHead className="text-right">Collection</TableHead>
               <TableHead className="text-right">ARPU</TableHead>
               <TableHead className="text-right">Paid Users</TableHead>
-              <TableHead className="text-right">Conv.</TableHead>
+              {showConv && (
+                <TableHead className="text-right">{conversionLabel}</TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -222,14 +246,20 @@ export function TrendSection({
                 <TableCell className="font-medium text-foreground">
                   {row.label}
                 </TableCell>
-                <TableCell className="text-right">{inr(row.collection)}</TableCell>
-                <TableCell className="text-right">{inr(row.arpu)}</TableCell>
+                <TableCell className="text-right">
+                  {inr(row.collection)}
+                </TableCell>
+                <TableCell className="text-right">
+                  {inr(row.arpu)}
+                </TableCell>
                 <TableCell className="text-right">
                   {intFmt(row.payers)}
                 </TableCell>
-                <TableCell className="text-right">
-                  {pct(row.conversion)}
-                </TableCell>
+                {showConv && (
+                  <TableCell className="text-right">
+                    {pct(row.conversion)}
+                  </TableCell>
+                )}
               </TableRow>
             ))}
           </TableBody>

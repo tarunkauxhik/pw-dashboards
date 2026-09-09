@@ -4,6 +4,8 @@ import type {
   AttributionRow,
   OrderRow,
   PushRow,
+  PwLiveFunnelRow,
+  PwLiveOrderRow,
   SignupRow,
 } from "@/types/sheet";
 import {
@@ -16,6 +18,13 @@ import {
   listValue,
   netCollection,
   paidUsers,
+  perBatchPeriodTable,
+  pwLiveArpu,
+  pwLiveConversionRate,
+  pwLiveGross,
+  pwLiveNet,
+  pwLivePaidUsers,
+  funnelTotals,
   revenueByChannel,
   revenueByCoupon,
   revenueByPlatform,
@@ -388,5 +397,138 @@ describe("push: topCampaigns", () => {
       p({ campaign_name: `C${i}`, sent: 100, attributed_revenue: i }),
     );
     expect(topCampaigns(rows, "attributed_revenue", 5)).toHaveLength(5);
+  });
+});
+
+// ── pw.live tests (PRD §6) ────────────────────────────────────────────
+
+function pw(partial: Partial<PwLiveOrderRow>): PwLiveOrderRow {
+  return {
+    order_date_ist: "2026-09-08",
+    batch_name: "Batch-A",
+    userid: "u",
+    price: 749,
+    ...partial,
+  };
+}
+
+function fn(partial: Partial<PwLiveFunnelRow>): PwLiveFunnelRow {
+  return {
+    event_date_ist: "2026-09-08",
+    batch_name: "Batch-A",
+    funnel_stage: "batch_description_view",
+    total_views: 10,
+    unique_users: 5,
+    ...partial,
+  };
+}
+
+describe("pwLivePaidUsers", () => {
+  it("counts unique users, not orders", () => {
+    const orders = [
+      pw({ userid: "a", price: 749 }),
+      pw({ userid: "a", price: 749 }),
+      pw({ userid: "b", price: 749 }),
+    ];
+    expect(pwLivePaidUsers(orders)).toBe(2);
+  });
+});
+
+describe("pwLiveGross", () => {
+  it("treats null price as 0, not an error", () => {
+    const orders = [
+      pw({ userid: "a", price: 749 }),
+      pw({ userid: "b", price: null }),
+    ];
+    expect(pwLiveGross(orders)).toBe(749);
+  });
+});
+
+describe("funnelTotals", () => {
+  it("keeps total_views and unique_users distinct", () => {
+    const funnel = [
+      fn({
+        funnel_stage: "batch_description_view",
+        total_views: 100,
+        unique_users: 40,
+      }),
+      fn({
+        funnel_stage: "batch_description_view",
+        total_views: 50,
+        unique_users: 20,
+      }),
+      fn({
+        funnel_stage: "order_page_view",
+        total_views: 10,
+        unique_users: 8,
+      }),
+    ];
+    const result = funnelTotals(funnel, "batch_description_view");
+    expect(result.totalViews).toBe(150);
+    expect(result.uniqueUsers).toBe(60);
+  });
+});
+
+describe("perBatchPeriodTable", () => {
+  it("never hardcodes batch names — derives them from the data", () => {
+    const orders = [
+      pw({
+        batch_name: "A New Course Nobody Coded For",
+        userid: "x",
+        price: 749,
+        order_date_ist: "2026-09-08",
+      }),
+    ];
+    const result = perBatchPeriodTable(orders, "2026-09-09");
+    expect(result.map((r) => r.batchName)).toContain(
+      "A New Course Nobody Coded For",
+    );
+  });
+
+  it("sorts by MTD Net Collection descending", () => {
+    const orders = [
+      pw({ batch_name: "low", price: 100, order_date_ist: "2026-09-05" }),
+      pw({ batch_name: "high", price: 5000, order_date_ist: "2026-09-05" }),
+    ];
+    const result = perBatchPeriodTable(orders, "2026-09-09");
+    expect(result[0].batchName).toBe("high");
+  });
+
+  it("MTD excludes orders outside the current calendar month", () => {
+    const orders = [
+      pw({ batch_name: "X", price: 1000, order_date_ist: "2026-08-31" }),
+      pw({ batch_name: "X", price: 100, order_date_ist: "2026-09-05" }),
+    ];
+    const result = perBatchPeriodTable(orders, "2026-09-09");
+    expect(result[0].mtd.netCollection).toBeCloseTo(100 / 1.18, 2);
+  });
+});
+
+describe("pwLiveArpu / pwLiveNet", () => {
+  it("ARPU is gross / payers", () => {
+    const orders = [
+      pw({ userid: "a", price: 1500 }),
+      pw({ userid: "b", price: 500 }),
+    ];
+    expect(pwLiveArpu(orders)).toBe(1000); // 2000 / 2
+    expect(pwLiveNet(orders)).toBeCloseTo(2000 / 1.18, 2);
+  });
+
+  it("ARPU returns 0 when there are no payers (avoid divide-by-zero)", () => {
+    expect(pwLiveArpu([])).toBe(0);
+  });
+});
+
+describe("pwLiveConversionRate", () => {
+  it("paid users / batch description unique viewers", () => {
+    const orders = [pw({ userid: "a" }), pw({ userid: "b" })];
+    const funnel = [fn({ unique_users: 100 })];
+    expect(
+      pwLiveConversionRate(orders, funnel, "2026-09-01", "2026-09-09"),
+    ).toBeCloseTo(2 / 100, 4);
+  });
+
+  it("returns 0 when denominator is 0", () => {
+    expect(pwLiveConversionRate([], [], "2026-09-01", "2026-09-09")).toBe(0);
   });
 });

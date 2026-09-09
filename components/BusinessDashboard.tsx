@@ -220,24 +220,24 @@ export function BusinessDashboard({ data }: Props) {
                 label="MoM — Month"
                 grouping="month"
                 range={range}
-                orders={ordersRange}
-                signupsForConversion={totalSignups}
+                rows={ordersRange}
+                conversionDenominator={totalSignups}
                 grossNet={ctx.grossNet}
               />
               <TrendSection
                 label="WoW — ISO Week (Mon-start)"
                 grouping="week"
                 range={range}
-                orders={ordersRange}
-                signupsForConversion={totalSignups}
+                rows={ordersRange}
+                conversionDenominator={totalSignups}
                 grossNet={ctx.grossNet}
               />
               <TrendSection
                 label="Last 7 Days"
                 grouping="day"
                 range={range}
-                orders={ordersRange}
-                signupsForConversion={totalSignups}
+                rows={ordersRange}
+                conversionDenominator={totalSignups}
                 grossNet={ctx.grossNet}
               />
             </div>
