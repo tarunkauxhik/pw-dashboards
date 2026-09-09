@@ -2,13 +2,38 @@ import type { MetaRow } from "@/types/sheet";
 import { getAnchorDate } from "@/lib/dateRanges";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 
-export function StatusBar({ meta }: { meta: MetaRow[] }) {
+interface Props {
+  meta: MetaRow[];
+  refreshError?: string | null;
+  fetchDurationMs?: number;
+}
+
+export function StatusBar({ meta, refreshError, fetchDurationMs }: Props) {
+  if (refreshError) {
+    return (
+      <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        <div>
+          <div className="font-medium">Last refresh failed</div>
+          <div className="mt-0.5 text-amber-800/90">{refreshError}</div>
+          <div className="mt-1 text-[11px] text-amber-700/80">
+            Showing the last good snapshot. Hit refresh in the sidebar to retry.
+          </div>
+        </div>
+      </div>
+    );
+  }
   const failed = meta.filter((m) => m.status !== "OK");
   if (meta.length === 0) {
     return (
       <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-900">
         <AlertTriangle className="h-3.5 w-3.5" />
         No metadata returned from sheet.
+        {typeof fetchDurationMs === "number" && fetchDurationMs > 0 && (
+          <span className="ml-2 text-amber-700/80">
+            · {fetchDurationMs}ms
+          </span>
+        )}
       </div>
     );
   }
@@ -19,6 +44,11 @@ export function StatusBar({ meta }: { meta: MetaRow[] }) {
         <CheckCircle2 className="h-3.5 w-3.5" />
         Data as of <span className="font-medium tabular-nums">{anchor}</span> IST
         <span className="ml-2 text-emerald-700/80">· all sources OK</span>
+        {typeof fetchDurationMs === "number" && fetchDurationMs > 0 && (
+          <span className="ml-2 text-emerald-700/80">
+            · {fetchDurationMs}ms
+          </span>
+        )}
       </div>
     );
   }

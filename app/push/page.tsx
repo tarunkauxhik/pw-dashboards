@@ -7,6 +7,7 @@ export default function PushPage() {
     <DashboardShell
       title="Push"
       subtitle="Campaign performance and attributed revenue."
+      sidebarMeta={{ lastRefreshedIso: null, isStale: false }}
     >
       <Card>
         <CardContent className="flex flex-col items-center gap-4 py-16 text-center">

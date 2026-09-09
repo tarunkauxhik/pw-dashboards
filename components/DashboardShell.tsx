@@ -6,16 +6,21 @@ export function DashboardShell({
   title,
   subtitle,
   statusBar,
+  sidebarMeta,
   children,
 }: {
   title: string;
   subtitle: string;
   statusBar?: ReactNode;
+  sidebarMeta?: { lastRefreshedIso: string | null; isStale: boolean };
   children: ReactNode;
 }) {
   return (
     <div className="flex min-h-screen">
-      <Sidebar />
+      <Sidebar
+        lastRefreshedIso={sidebarMeta?.lastRefreshedIso ?? null}
+        isStale={sidebarMeta?.isStale ?? false}
+      />
       <main className="flex-1 md:pl-[240px]">
         <div className="mx-auto w-full max-w-[1400px] space-y-6 p-6 md:p-8">
           <Breadcrumbs title={title} />
