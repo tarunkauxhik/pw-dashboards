@@ -7,20 +7,37 @@ import {
   TableHeader,
   TableRow,
 } from "./ui/table";
+import { FormulaInfo } from "./FormulaInfo";
 import { inr, intFmt } from "@/lib/format";
 import { revenueByCoupon } from "@/lib/metrics";
+import type { GrossNet } from "./GrossNetToggle";
+import type { OrderRow } from "@/types/sheet";
 
 export function TopCouponsTable({
   orders,
   topN = 10,
+  grossNet,
 }: {
-  orders: Parameters<typeof revenueByCoupon>[0];
+  orders: OrderRow[];
   topN?: number;
+  grossNet: GrossNet;
 }) {
-  const rows = revenueByCoupon(orders).slice(0, topN);
+  const ordersForRevenue =
+    grossNet === "gross"
+      ? orders
+      : orders.map((o) => ({ ...o, price: o.price / 1.18 }));
+  const rows = revenueByCoupon(ordersForRevenue).slice(0, topN);
+  const formula = grossNet === "net" ? "Σ order.price ÷ 1.18" : "Σ order.price";
   return (
     <Card>
-      <CardHeader>
+      <CardHeader
+        action={
+          <FormulaInfo
+            formula={formula}
+            note="Grouped by order.coupon_code, summed. Discount is the raw coupon_discount (unchanged by Gross/Net)."
+          />
+        }
+      >
         <CardTitle>Top Coupons</CardTitle>
       </CardHeader>
       <CardContent>

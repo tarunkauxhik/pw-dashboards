@@ -1,13 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "./ui/card";
+import { useEffect, useMemo, useState } from "react";
+import { Card, CardContent } from "./ui/card";
 import {
   Table,
   TableBody,
@@ -17,6 +11,7 @@ import {
   TableRow,
 } from "./ui/table";
 import { cn } from "@/lib/utils";
+import { FormulaInfo } from "./FormulaInfo";
 import { inr, intFmt, pct } from "@/lib/format";
 import type { AppsFlyerRow } from "@/types/sheet";
 
@@ -78,15 +73,13 @@ export function ChannelTable({ rows }: { rows: AppsFlyerRow[] }) {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Channel Performance</CardTitle>
-        <CardDescription>
-          Some rows above are promotional coupon codes (e.g. SPIN15,
-          JANMASHTAMI) that have leaked into channel attribution — a known
-          tracking bug, not a real acquisition channel.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4 pt-5">
+        <div className="flex items-center justify-end">
+          <FormulaInfo
+            formula="Group Σ af_daily.{installs, cost_inr, impressions, clicks}"
+            note="Grouped by media_source. CTR = Σ clicks ÷ Σ impressions."
+          />
+        </div>
         <Table>
           <TableHeader>
             <TableRow>
@@ -152,6 +145,11 @@ export function ChannelTable({ rows }: { rows: AppsFlyerRow[] }) {
             )}
           </TableBody>
         </Table>
+        <p className="text-[11px] text-muted-foreground">
+          Some rows above are promotional coupon codes (e.g. SPIN15,
+          JANMASHTAMI) that have leaked into channel attribution — a known
+          tracking bug, not a real acquisition channel.
+        </p>
       </CardContent>
     </Card>
   );

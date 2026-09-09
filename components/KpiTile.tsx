@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { FormulaInfo } from "./FormulaInfo";
 
 interface Delta {
   text: string;
@@ -11,6 +12,8 @@ interface Props {
   delta?: Delta | null;
   hint?: string;
   emphasis?: "primary" | "secondary";
+  formula?: string;
+  formulaNote?: string;
 }
 
 export function KpiTile({
@@ -19,6 +22,8 @@ export function KpiTile({
   delta,
   hint,
   emphasis = "primary",
+  formula,
+  formulaNote,
 }: Props) {
   return (
     <div
@@ -27,8 +32,13 @@ export function KpiTile({
         "shadow-[0_1px_2px_rgba(0,0,0,0.04)]",
       )}
     >
-      <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-        {label}
+      <div className="flex items-start justify-between gap-2">
+        <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          {label}
+        </div>
+        {formula && (
+          <FormulaInfo formula={formula} note={formulaNote} className="shrink-0" />
+        )}
       </div>
       <div
         className={cn(

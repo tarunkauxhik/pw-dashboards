@@ -11,17 +11,22 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { EmptyChart } from "./EmptyChart";
+import { FormulaInfo } from "./FormulaInfo";
 import { inr } from "@/lib/format";
+import type { GrossNet } from "./GrossNetToggle";
 
 export function GatewayRevenueChart({
   data,
+  grossNet,
 }: {
   data: { method: string; revenue: number }[];
+  grossNet: GrossNet;
 }) {
+  const formula = grossNet === "net" ? "Σ order.price ÷ 1.18" : "Σ order.price";
   if (data.length === 0) {
     return (
       <Card>
-        <CardHeader>
+        <CardHeader action={<FormulaInfo formula={formula} />}>
           <CardTitle>Revenue by Payment Method</CardTitle>
         </CardHeader>
         <CardContent>
@@ -32,7 +37,14 @@ export function GatewayRevenueChart({
   }
   return (
     <Card>
-      <CardHeader>
+      <CardHeader
+        action={
+          <FormulaInfo
+            formula={formula}
+            note='Grouped by `${order.gateway} · ${order.payment_method}`, summed.'
+          />
+        }
+      >
         <CardTitle>Revenue by Payment Method</CardTitle>
       </CardHeader>
       <CardContent>

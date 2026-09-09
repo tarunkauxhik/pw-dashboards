@@ -3,20 +3,25 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { EmptyChart } from "./EmptyChart";
+import { FormulaInfo } from "./FormulaInfo";
 import { inr } from "@/lib/format";
+import type { GrossNet } from "./GrossNetToggle";
 
 const COLORS = ["#0f172a", "#10b981", "#f59e0b", "#6366f1", "#ec4899", "#94a3b8"];
 
 export function PlatformRevenueChart({
   data,
+  grossNet,
 }: {
   data: Record<string, number>;
+  grossNet: GrossNet;
 }) {
   const entries = Object.entries(data).sort((a, b) => b[1] - a[1]);
+  const formula = grossNet === "net" ? "Σ order.price ÷ 1.18" : "Σ order.price";
   if (entries.length === 0) {
     return (
       <Card>
-        <CardHeader>
+        <CardHeader action={<FormulaInfo formula={formula} />}>
           <CardTitle>Revenue by Platform</CardTitle>
         </CardHeader>
         <CardContent>
@@ -27,7 +32,9 @@ export function PlatformRevenueChart({
   }
   return (
     <Card>
-      <CardHeader>
+      <CardHeader
+        action={<FormulaInfo formula={formula} note="Grouped by order.platform, summed." />}
+      >
         <CardTitle>Revenue by Platform</CardTitle>
       </CardHeader>
       <CardContent>

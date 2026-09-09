@@ -8,12 +8,10 @@ import { BuyTypeTable } from "./BuyTypeTable";
 import { PlatformRevenueChart } from "./PlatformRevenueChart";
 import { GatewayRevenueChart } from "./GatewayRevenueChart";
 import { TopCouponsTable } from "./TopCouponsTable";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import {
   grossCollection,
   netCollection,
   paidUsers,
-  filterRevenueOrders,
   revenueByPlatform,
   conversionRate,
   discountGiven,
@@ -61,6 +59,38 @@ function projectCollection(orders: OrderRow[], grossNet: GrossNet): number {
   return grossNet === "gross"
     ? grossCollection(orders)
     : netCollection(orders);
+}
+
+function collectionFormula(grossNet: GrossNet): string {
+  return grossNet === "net"
+    ? "Σ order.price ÷ 1.18"
+    : "Σ order.price";
+}
+
+function arpuFormula(grossNet: GrossNet): string {
+  return grossNet === "net"
+    ? "(Σ order.price ÷ 1.18) ÷ |Unique userids|"
+    : "Σ order.price ÷ |Unique userids|";
+}
+
+function conversionFormula(): string {
+  return "|Unique userids in period| ÷ |Period signups|";
+}
+
+function aovFormula(grossNet: GrossNet): string {
+  return grossNet === "net"
+    ? "(Σ order.price ÷ 1.18) ÷ |period orders|"
+    : "Σ order.price ÷ |period orders|";
+}
+
+function listValueFormula(grossNet: GrossNet): string {
+  return grossNet === "net"
+    ? "Σ (order.price ÷ 1.18 + order.coupon_discount)"
+    : "Σ (order.price + order.coupon_discount)";
+}
+
+function discountGivenFormula(): string {
+  return "Σ order.coupon_discount (independent of Net/Gross toggle)";
 }
 
 export function BusinessDashboard({ data, anchor }: Props) {
@@ -134,11 +164,15 @@ export function BusinessDashboard({ data, anchor }: Props) {
                   label="Installs"
                   value={intFmt(installs)}
                   delta={deltaStr(installs, priorInstalls)}
+                  formula="Σ af_daily.installs"
+                  formulaNote="From AppsFlyer daily grain. Ad-side."
                 />
                 <KpiTile
                   label="Sign-Ups"
                   value={intFmt(totalSignups)}
                   delta={deltaStr(totalSignups, priorSignups)}
+                  formula="Σ mb_signups_daily.signups"
+                  formulaNote="From signups tab. Additive across days."
                 />
                 <KpiTile
                   label={
@@ -151,22 +185,29 @@ export function BusinessDashboard({ data, anchor }: Props) {
                   hint={
                     ctx.grossNet === "net" ? "Net = Gross / 1.18" : undefined
                   }
+                  formula={collectionFormula(ctx.grossNet)}
+                  formulaNote="price in mb_orders is already NET of coupon."
                 />
                 <KpiTile
                   label="Paid Users"
                   value={intFmt(payers)}
                   delta={deltaStr(payers, priorPayers)}
+                  formula="|Unique userids|"
+                  formulaNote="Recomputed via Set, never summed across days."
                 />
                 <KpiTile
                   label="ARPU"
                   value={inr(arpuVal)}
                   delta={deltaStr(arpuVal, priorArpu)}
+                  formula={arpuFormula(ctx.grossNet)}
                 />
                 <KpiTile
                   label="Conversion"
                   value={pct(conv, 2)}
                   delta={deltaStr(conv, priorConv)}
                   hint="Period-based"
+                  formula={conversionFormula()}
+                  formulaNote="Period-based: payers and signups in the same window."
                 />
               </div>
             </Section>
@@ -177,24 +218,30 @@ export function BusinessDashboard({ data, anchor }: Props) {
                   emphasis="secondary"
                   label="Discount Given"
                   value={inr(discountGiven(ordersRange))}
+                  formula={discountGivenFormula()}
+                  formulaNote="Raw coupon_discount field; not divided by 1.18."
                 />
                 <KpiTile
                   emphasis="secondary"
                   label="List Value"
                   value={inr(listValue(ordersRange))}
                   hint="price + coupon_discount"
+                  formula={listValueFormula(ctx.grossNet)}
                 />
                 <KpiTile
                   emphasis="secondary"
                   label="Avg Order Value"
                   value={inr(aov)}
                   delta={deltaStr(aov, priorAov)}
+                  formula={aovFormula(ctx.grossNet)}
                 />
                 <KpiTile
                   emphasis="secondary"
                   label="Refund Rate"
                   value="0%"
                   hint="No refund data exists"
+                  formula="hardcoded 0%"
+                  formulaNote="No refund data exists for GyaanE — confirmed, not a gap to fix later."
                 />
               </div>
             </Section>
@@ -206,6 +253,7 @@ export function BusinessDashboard({ data, anchor }: Props) {
                 range={range}
                 orders={ordersRange}
                 signupsForConversion={totalSignups}
+                grossNet={ctx.grossNet}
               />
               <TrendSection
                 label="WoW — ISO Week (Mon-start)"
@@ -213,6 +261,7 @@ export function BusinessDashboard({ data, anchor }: Props) {
                 range={range}
                 orders={ordersRange}
                 signupsForConversion={totalSignups}
+                grossNet={ctx.grossNet}
               />
               <TrendSection
                 label="Last 7 Days"
@@ -220,6 +269,7 @@ export function BusinessDashboard({ data, anchor }: Props) {
                 range={range}
                 orders={ordersRange}
                 signupsForConversion={totalSignups}
+                grossNet={ctx.grossNet}
               />
             </div>
 
@@ -229,7 +279,10 @@ export function BusinessDashboard({ data, anchor }: Props) {
 
             <Section title="Revenue Breakdown">
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                <PlatformRevenueChart data={revenueByPlatform(ordersRange)} />
+                <PlatformRevenueChart
+                  data={revenueByPlatform(ordersRange)}
+                  grossNet={ctx.grossNet}
+                />
                 <GatewayRevenueChart
                   data={Object.entries(
                     ordersRange.reduce<Record<string, number>>((acc, o) => {
@@ -241,8 +294,12 @@ export function BusinessDashboard({ data, anchor }: Props) {
                     .map(([method, revenue]) => ({ method, revenue }))
                     .sort((a, b) => b.revenue - a.revenue)
                     .slice(0, 8)}
+                  grossNet={ctx.grossNet}
                 />
-                <TopCouponsTable orders={ordersRange} />
+                <TopCouponsTable
+                  orders={ordersRange}
+                  grossNet={ctx.grossNet}
+                />
               </div>
             </Section>
           </div>

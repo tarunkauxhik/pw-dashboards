@@ -21,13 +21,11 @@ import {
   TableRow,
 } from "./ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { FormulaInfo } from "./FormulaInfo";
 import { inr, intFmt, pct } from "@/lib/format";
 import type { OrderRow } from "@/types/sheet";
-import {
-  arpu,
-  grossCollection,
-  paidUsers,
-} from "@/lib/metrics";
+import { paidUsers } from "@/lib/metrics";
+import type { GrossNet } from "./GrossNetToggle";
 import {
   dayKey,
   isoWeekKey,
@@ -43,6 +41,7 @@ interface Props {
   range: DateRange;
   orders: OrderRow[];
   signupsForConversion: number;
+  grossNet: GrossNet;
 }
 
 function groupOrders(
@@ -77,32 +76,67 @@ function shortLabel(key: string, grouping: Grouping): string {
   return key.slice(5);
 }
 
+function collectionFor(
+  orders: OrderRow[],
+  grossNet: GrossNet,
+): number {
+  if (grossNet === "gross") {
+    return orders.reduce((s, o) => s + o.price, 0);
+  }
+  return orders.reduce((s, o) => s + o.price, 0) / 1.18;
+}
+
+function collectionFormula(grossNet: GrossNet): string {
+  return grossNet === "net"
+    ? "Σ order.price ÷ 1.18"
+    : "Σ order.price";
+}
+
+function arpuFormula(grossNet: GrossNet): string {
+  return grossNet === "net"
+    ? "(Σ order.price ÷ 1.18) ÷ |Unique userids|"
+    : "Σ order.price ÷ |Unique userids|";
+}
+
+function conversionFormula(): string {
+  return "|Unique userids in period| ÷ |Period signups|";
+}
+
 export function TrendSection({
   label,
   grouping,
   range,
   orders,
   signupsForConversion,
+  grossNet,
 }: Props) {
   const grouped = groupOrders(orders, grouping);
 
-  const series = Array.from(grouped.entries()).map(([key, groupOrders]) => {
-    const gross = grossCollection(groupOrders);
-    const payers = paidUsers(groupOrders);
+  const series = Array.from(grouped.entries()).map(([key, periodOrders]) => {
+    const collection = collectionFor(periodOrders, grossNet);
+    const payers = paidUsers(periodOrders);
     return {
       key,
       label: shortLabel(key, grouping),
-      gross,
-      arpu: arpu(groupOrders),
+      collection,
+      arpu: payers === 0 ? 0 : collection / payers,
       payers,
-      conversion: signupsForConversion > 0 ? payers / signupsForConversion : 0,
+      conversion:
+        signupsForConversion > 0 ? payers / signupsForConversion : 0,
     };
   });
 
   if (series.length === 0) {
     return (
       <Card>
-        <CardHeader>
+        <CardHeader
+          action={
+            <FormulaInfo
+              formula={collectionFormula(grossNet)}
+              note={`Series recomputed per ${grouping} bucket from raw rows (no daily pre-aggregation).`}
+            />
+          }
+        >
           <CardTitle>{label}</CardTitle>
         </CardHeader>
         <CardContent>
@@ -114,7 +148,14 @@ export function TrendSection({
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader
+        action={
+          <FormulaInfo
+            formula={collectionFormula(grossNet)}
+            note={`Bars = Σ order.price per ${grouping} bucket. ARPU line = Σ order.price ÷ |Unique userids|. Recomputed from raw rows; not sum of daily pre-aggregates.`}
+          />
+        }
+      >
         <CardTitle>{label}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -172,7 +213,7 @@ export function TrendSection({
               />
               <Bar
                 yAxisId="left"
-                dataKey="gross"
+                dataKey="collection"
                 name="Collection"
                 fill="hsl(var(--foreground))"
                 radius={[3, 3, 0, 0]}
@@ -207,12 +248,36 @@ export function TrendSection({
                 <TableCell className="font-medium text-foreground">
                   {row.label}
                 </TableCell>
-                <TableCell className="text-right">{inr(row.gross)}</TableCell>
-                <TableCell className="text-right">{inr(row.arpu)}</TableCell>
                 <TableCell className="text-right">
+                  <FormulaInfo
+                    label="How is Collection computed here?"
+                    formula={collectionFormula(grossNet)}
+                    className="inline-block align-middle"
+                  />{" "}
+                  {inr(row.collection)}
+                </TableCell>
+                <TableCell className="text-right">
+                  <FormulaInfo
+                    label="How is ARPU computed here?"
+                    formula={arpuFormula(grossNet)}
+                    className="inline-block align-middle"
+                  />{" "}
+                  {inr(row.arpu)}
+                </TableCell>
+                <TableCell className="text-right">
+                  <FormulaInfo
+                    label="How is Paid Users computed here?"
+                    formula="|Unique userids in this period|"
+                    className="inline-block align-middle"
+                  />{" "}
                   {intFmt(row.payers)}
                 </TableCell>
                 <TableCell className="text-right">
+                  <FormulaInfo
+                    label="How is Conv computed here?"
+                    formula={conversionFormula()}
+                    className="inline-block align-middle"
+                  />{" "}
                   {pct(row.conversion)}
                 </TableCell>
               </TableRow>

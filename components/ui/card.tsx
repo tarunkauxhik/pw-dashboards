@@ -18,15 +18,22 @@ Card.displayName = "Card";
 
 export const CardHeader = React.forwardRef<
   HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
+  React.HTMLAttributes<HTMLDivElement> & { action?: React.ReactNode }
+>(({ className, action, children, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("flex flex-col gap-1.5 p-5 pb-3", className)}
+    className={cn(
+      "flex gap-1.5 p-5 pb-3",
+      action ? "flex-row items-start justify-between" : "flex-col",
+      className,
+    )}
     {...props}
-  />
+  >
+    <div className="flex flex-col gap-1.5">{children}</div>
+    {action && <div className="shrink-0">{action}</div>}
+  </div>
 ));
-CardHeader.displayName = "CardHeader";
+CardHeader.displayName = "CardTitle";
 
 export const CardTitle = React.forwardRef<
   HTMLDivElement,
