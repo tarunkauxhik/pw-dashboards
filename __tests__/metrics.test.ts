@@ -3,6 +3,7 @@ import type {
   AppsFlyerRow,
   AttributionRow,
   OrderRow,
+  PushRow,
   SignupRow,
 } from "@/types/sheet";
 import {
@@ -19,6 +20,13 @@ import {
   revenueByCoupon,
   revenueByPlatform,
   revenueByPricePoint,
+  totalAttributedRevenue,
+  totalClicks,
+  totalConvertedUsers,
+  totalSent,
+  ctr,
+  revenuePerConvertedUser,
+  topCampaigns,
 } from "@/lib/metrics";
 
 function o(partial: Partial<OrderRow>): OrderRow {
@@ -33,6 +41,18 @@ function o(partial: Partial<OrderRow>): OrderRow {
     coupon_discount: 0,
     gateway: "PAYU",
     payment_method: "UPI",
+    ...partial,
+  };
+}
+
+function p(partial: Partial<PushRow>): PushRow {
+  return {
+    report_date: "2026-09-08",
+    campaign_name: "Push-fest-D1",
+    sent: 100,
+    unique_clicks: 5,
+    converted_users: 1,
+    attributed_revenue: 749,
     ...partial,
   };
 }
@@ -241,5 +261,132 @@ describe("revenueByPricePoint", () => {
 
   it("returns empty array for empty input", () => {
     expect(revenueByPricePoint([])).toEqual([]);
+  });
+});
+
+describe("push: totalSent / totalClicks / totalAttributedRevenue / totalConvertedUsers / ctr / revenuePerConvertedUser", () => {
+  it("totalSent sums sent counts", () => {
+    const rows = [
+      p({ sent: 100 }),
+      p({ sent: 250 }),
+      p({ sent: 50 }),
+    ];
+    expect(totalSent(rows)).toBe(400);
+  });
+
+  it("totalClicks sums unique_clicks counts", () => {
+    const rows = [
+      p({ unique_clicks: 5 }),
+      p({ unique_clicks: 12 }),
+    ];
+    expect(totalClicks(rows)).toBe(17);
+  });
+
+  it("totalAttributedRevenue sums across rows", () => {
+    const rows = [
+      { attributed_revenue: 749 } as PushRow,
+      { attributed_revenue: 1498 } as PushRow,
+    ];
+    expect(totalAttributedRevenue(rows)).toBe(2247);
+  });
+
+  it("totalConvertedUsers sums (note: per-campaign duplicate users are an upstream property, not a bug)", () => {
+    const rows = [
+      p({ converted_users: 3 }),
+      p({ converted_users: 5 }),
+    ];
+    expect(totalConvertedUsers(rows)).toBe(8);
+  });
+
+  it("ctr returns clicks / sent, 0 when sent=0", () => {
+    expect(ctr([])).toBe(0);
+    expect(ctr([p({ sent: 0, unique_clicks: 0 })])).toBe(0);
+    expect(ctr([p({ sent: 200, unique_clicks: 40 })])).toBeCloseTo(
+      40 / 200,
+      4,
+    );
+  });
+
+  it("revenuePerConvertedUser divides revenue by users", () => {
+    const rows = [
+      p({ converted_users: 4, attributed_revenue: 1498 }),
+    ];
+    expect(revenuePerConvertedUser(rows)).toBeCloseTo(1498 / 4, 4);
+    expect(revenuePerConvertedUser([])).toBe(0);
+  });
+});
+
+describe("push: topCampaigns", () => {
+  it("excludes zero-send rows", () => {
+    const rows = [
+      p({
+        campaign_name: "A",
+        sent: 0,
+        unique_clicks: 0,
+        converted_users: 0,
+        attributed_revenue: 0,
+      }),
+      p({
+        campaign_name: "B",
+        sent: 100,
+        unique_clicks: 5,
+        converted_users: 1,
+        attributed_revenue: 749,
+      }),
+    ];
+    const result = topCampaigns(rows);
+    expect(result).toHaveLength(1);
+    expect(result[0].campaign_name).toBe("B");
+  });
+
+  it("aggregates the same campaign across multiple days", () => {
+    const rows = [
+      p({
+        campaign_name: "A",
+        sent: 100,
+        unique_clicks: 5,
+        converted_users: 1,
+        attributed_revenue: 749,
+        report_date: "2026-09-01",
+      }),
+      p({
+        campaign_name: "A",
+        sent: 200,
+        unique_clicks: 10,
+        converted_users: 2,
+        attributed_revenue: 1498,
+        report_date: "2026-09-02",
+      }),
+    ];
+    const result = topCampaigns(rows);
+    expect(result).toHaveLength(1);
+    expect(result[0].sent).toBe(300);
+    expect(result[0].attributed_revenue).toBe(2247);
+    expect(result[0].ctr).toBeCloseTo(15 / 300, 4);
+  });
+
+  it("sorts by attributed_revenue descending by default", () => {
+    const rows = [
+      p({ campaign_name: "low", sent: 100, attributed_revenue: 100 }),
+      p({ campaign_name: "high", sent: 100, attributed_revenue: 1000 }),
+    ];
+    const result = topCampaigns(rows);
+    expect(result[0].campaign_name).toBe("high");
+  });
+
+  it("supports sort by converted_users", () => {
+    const rows = [
+      p({ campaign_name: "low", sent: 100, converted_users: 1, attributed_revenue: 100 }),
+      p({ campaign_name: "high", sent: 100, converted_users: 10, attributed_revenue: 50 }),
+    ];
+    const result = topCampaigns(rows, "converted_users");
+    expect(result[0].campaign_name).toBe("high");
+  });
+
+  it("honors the limit argument", () => {
+    const rows = Array.from({ length: 30 }, (_, i) =>
+      p({ campaign_name: `C${i}`, sent: 100, attributed_revenue: i }),
+    );
+    expect(topCampaigns(rows, "attributed_revenue", 5)).toHaveLength(5);
   });
 });

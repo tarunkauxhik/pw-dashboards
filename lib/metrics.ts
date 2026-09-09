@@ -2,6 +2,7 @@ import type {
   AppsFlyerRow,
   AttributionRow,
   OrderRow,
+  PushRow,
   SignupRow,
 } from "@/types/sheet";
 
@@ -146,4 +147,96 @@ export function revenueByChannel(
       revenue: v.revenue,
     }))
     .sort((a, b) => b.revenue - a.revenue);
+}
+
+// ── Push metrics (Dashboard 3) ──────────────────────────────────────────
+// Source rows come from mb_push_daily. Each row is one (campaign, day)
+// with its four counts. The PRD guarantees one row per (date, campaign)
+// pair is already aggregated by the upstream Metabase query, so no
+// frontend dedup is needed.
+
+export function totalSent(rows: PushRow[]): number {
+  return rows.reduce((sum, r) => sum + r.sent, 0);
+}
+
+export function totalClicks(rows: PushRow[]): number {
+  return rows.reduce((sum, r) => sum + r.unique_clicks, 0);
+}
+
+export function ctr(rows: PushRow[]): number {
+  const sent = totalSent(rows);
+  return sent === 0 ? 0 : totalClicks(rows) / sent;
+}
+
+/**
+ * PRD rule 2: MoEngage counts conversions per campaign independently.
+ * A user converting via two different campaigns in the same window can
+ * be counted twice in this sum — that's a property of the source data,
+ * not a bug in this frontend. There is no shared userid to de-dupe on.
+ */
+export function totalConvertedUsers(rows: PushRow[]): number {
+  return rows.reduce((sum, r) => sum + r.converted_users, 0);
+}
+
+export function totalAttributedRevenue(rows: PushRow[]): number {
+  return rows.reduce((sum, r) => sum + r.attributed_revenue, 0);
+}
+
+export function revenuePerConvertedUser(rows: PushRow[]): number {
+  const users = totalConvertedUsers(rows);
+  return users === 0 ? 0 : totalAttributedRevenue(rows) / users;
+}
+
+export type PushSortKey =
+  | "attributed_revenue"
+  | "converted_users"
+  | "sent"
+  | "unique_clicks"
+  | "ctr";
+
+/**
+ * Aggregate push rows across the selected date range into one row per
+ * campaign. Zero-send rows are dropped from the result (Rule 3) but
+ * remain in raw totals (they contribute 0).
+ */
+export function topCampaigns(
+  rows: PushRow[],
+  sortBy: PushSortKey = "attributed_revenue",
+  limit = 15,
+): { campaign_name: string; sent: number; unique_clicks: number; converted_users: number; attributed_revenue: number; ctr: number }[] {
+  const map = new Map<
+    string,
+    {
+      campaign_name: string;
+      sent: number;
+      unique_clicks: number;
+      converted_users: number;
+      attributed_revenue: number;
+    }
+  >();
+  for (const r of rows) {
+    if (r.sent === 0) continue;
+    const cur = map.get(r.campaign_name);
+    if (cur) {
+      cur.sent += r.sent;
+      cur.unique_clicks += r.unique_clicks;
+      cur.converted_users += r.converted_users;
+      cur.attributed_revenue += r.attributed_revenue;
+    } else {
+      map.set(r.campaign_name, {
+        campaign_name: r.campaign_name,
+        sent: r.sent,
+        unique_clicks: r.unique_clicks,
+        converted_users: r.converted_users,
+        attributed_revenue: r.attributed_revenue,
+      });
+    }
+  }
+  return [...map.values()]
+    .map((r) => ({
+      ...r,
+      ctr: r.sent === 0 ? 0 : r.unique_clicks / r.sent,
+    }))
+    .sort((a, b) => b[sortBy] - a[sortBy])
+    .slice(0, limit);
 }

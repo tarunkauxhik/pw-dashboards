@@ -2,6 +2,7 @@ import type {
   AppsFlyerRow,
   AttributionRow,
   OrderRow,
+  PushRow,
   SignupRow,
 } from "@/types/sheet";
 import type { DateRange } from "./dateRanges";
@@ -28,6 +29,15 @@ export function byAfDateRange(
   rows: AppsFlyerRow[],
   range: DateRange,
 ): AppsFlyerRow[] {
+  return rows.filter(
+    (r) => r.report_date >= range.from && r.report_date <= range.to,
+  );
+}
+
+export function byPushDateRange(
+  rows: PushRow[],
+  range: DateRange,
+): PushRow[] {
   return rows.filter(
     (r) => r.report_date >= range.from && r.report_date <= range.to,
   );
