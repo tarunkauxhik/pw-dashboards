@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/react";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 
@@ -22,6 +23,7 @@ export default function RootLayout({
     <html lang="en" className={jakarta.variable}>
       <body className="min-h-screen bg-background font-sans antialiased">
         {children}
+        <Analytics />
       </body>
     </html>
   );
