@@ -27,17 +27,9 @@ export function TopCouponsTable({
       ? orders
       : orders.map((o) => ({ ...o, price: o.price / 1.18 }));
   const rows = revenueByCoupon(ordersForRevenue).slice(0, topN);
-  const formula = grossNet === "net" ? "Σ order.price ÷ 1.18" : "Σ order.price";
   return (
     <Card>
-      <CardHeader
-        action={
-          <FormulaInfo
-            formula={formula}
-            note="Grouped by order.coupon_code, summed. Discount is the raw coupon_discount (unchanged by Gross/Net)."
-          />
-        }
-      >
+      <CardHeader action={<FormulaInfo formula="Σ order.price per coupon · /1.18 if Net" />}>
         <CardTitle>Top Coupons</CardTitle>
       </CardHeader>
       <CardContent>

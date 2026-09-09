@@ -17,11 +17,10 @@ export function PlatformRevenueChart({
   grossNet: GrossNet;
 }) {
   const entries = Object.entries(data).sort((a, b) => b[1] - a[1]);
-  const formula = grossNet === "net" ? "Σ order.price ÷ 1.18" : "Σ order.price";
   if (entries.length === 0) {
     return (
       <Card>
-        <CardHeader action={<FormulaInfo formula={formula} />}>
+        <CardHeader action={<FormulaInfo formula="Σ order.price per platform" />}>
           <CardTitle>Revenue by Platform</CardTitle>
         </CardHeader>
         <CardContent>
@@ -32,9 +31,7 @@ export function PlatformRevenueChart({
   }
   return (
     <Card>
-      <CardHeader
-        action={<FormulaInfo formula={formula} note="Grouped by order.platform, summed." />}
-      >
+      <CardHeader action={<FormulaInfo formula="Σ order.price per platform · /1.18 if Net" />}>
         <CardTitle>Revenue by Platform</CardTitle>
       </CardHeader>
       <CardContent>

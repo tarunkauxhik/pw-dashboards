@@ -92,29 +92,25 @@ export function MarketingDashboard({ data, anchor }: Props) {
                   value={intFmt(installs)}
                   delta={deltaStr(installs, priorInstalls)}
                   formula="Σ af_daily.installs"
-                  formulaNote="From AppsFlyer daily grain."
                 />
                 <KpiTile
                   label="Total Ad Cost"
                   value={inr(cost)}
                   delta={deltaStr(cost, priorCost)}
                   formula="Σ af_daily.cost_inr"
-                  formulaNote="Ad-side spend (INR)."
                 />
                 <KpiTile
                   label="CAC"
                   value={inr(cacVal)}
                   delta={deltaStr(cacVal, priorCacVal)}
                   hint="cost / installs"
-                  formula="Σ af_daily.cost_inr ÷ Σ af_daily.installs"
-                  formulaNote="Android-only cost data exists for GyaanE."
+                  formula="ad cost / installs"
                 />
                 <KpiTile
                   label="Paid Users"
                   value={intFmt(payers)}
                   delta={deltaStr(payers, priorPayers)}
-                  formula="|Unique userids in period|"
-                  formulaNote="Same definition as on Business."
+                  formula="unique userids"
                 />
               </div>
             </section>

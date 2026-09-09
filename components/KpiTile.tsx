@@ -37,7 +37,11 @@ export function KpiTile({
           {label}
         </div>
         {formula && (
-          <FormulaInfo formula={formula} note={formulaNote} className="shrink-0" />
+          <FormulaInfo
+            formula={formula}
+            note={formulaNote}
+            className="shrink-0 pt-0.5"
+          />
         )}
       </div>
       <div

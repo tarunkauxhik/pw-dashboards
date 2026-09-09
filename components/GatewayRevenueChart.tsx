@@ -22,11 +22,10 @@ export function GatewayRevenueChart({
   data: { method: string; revenue: number }[];
   grossNet: GrossNet;
 }) {
-  const formula = grossNet === "net" ? "Σ order.price ÷ 1.18" : "Σ order.price";
   if (data.length === 0) {
     return (
       <Card>
-        <CardHeader action={<FormulaInfo formula={formula} />}>
+        <CardHeader action={<FormulaInfo formula="Σ order.price per gateway·method" />}>
           <CardTitle>Revenue by Payment Method</CardTitle>
         </CardHeader>
         <CardContent>
@@ -37,14 +36,7 @@ export function GatewayRevenueChart({
   }
   return (
     <Card>
-      <CardHeader
-        action={
-          <FormulaInfo
-            formula={formula}
-            note='Grouped by `${order.gateway} · ${order.payment_method}`, summed.'
-          />
-        }
-      >
+      <CardHeader action={<FormulaInfo formula="Σ order.price per gateway·method · /1.18 if Net" />}>
         <CardTitle>Revenue by Payment Method</CardTitle>
       </CardHeader>
       <CardContent>

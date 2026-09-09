@@ -21,14 +21,7 @@ export function InstallsCostTrend({ rows }: { rows: AppsFlyerRow[] }) {
   if (rows.length === 0) {
     return (
       <Card>
-        <CardHeader
-          action={
-            <FormulaInfo
-              formula="Σ af_daily.{installs, cost_inr} per report_date"
-              note="Daily grain. Cost is in INR."
-            />
-          }
-        >
+        <CardHeader action={<FormulaInfo formula="Σ af_daily.installs + Σ cost_inr per day" />}>
           <CardTitle>Installs & Cost</CardTitle>
         </CardHeader>
         <CardContent>
@@ -54,14 +47,7 @@ export function InstallsCostTrend({ rows }: { rows: AppsFlyerRow[] }) {
 
   return (
     <Card>
-      <CardHeader
-        action={
-          <FormulaInfo
-            formula="Σ af_daily.installs (bars) + Σ af_daily.cost_inr (line)"
-            note="Daily grain, summed per report_date."
-          />
-        }
-      >
+      <CardHeader action={<FormulaInfo formula="Σ af_daily.installs (bar) + Σ cost_inr (line) per day" />}>
         <CardTitle>Installs & Cost</CardTitle>
       </CardHeader>
       <CardContent>

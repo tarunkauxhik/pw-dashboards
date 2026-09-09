@@ -67,32 +67,6 @@ function collectionFormula(grossNet: GrossNet): string {
     : "Σ order.price";
 }
 
-function arpuFormula(grossNet: GrossNet): string {
-  return grossNet === "net"
-    ? "(Σ order.price ÷ 1.18) ÷ |Unique userids|"
-    : "Σ order.price ÷ |Unique userids|";
-}
-
-function conversionFormula(): string {
-  return "|Unique userids in period| ÷ |Period signups|";
-}
-
-function aovFormula(grossNet: GrossNet): string {
-  return grossNet === "net"
-    ? "(Σ order.price ÷ 1.18) ÷ |period orders|"
-    : "Σ order.price ÷ |period orders|";
-}
-
-function listValueFormula(grossNet: GrossNet): string {
-  return grossNet === "net"
-    ? "Σ (order.price ÷ 1.18 + order.coupon_discount)"
-    : "Σ (order.price + order.coupon_discount)";
-}
-
-function discountGivenFormula(): string {
-  return "Σ order.coupon_discount (independent of Net/Gross toggle)";
-}
-
 export function BusinessDashboard({ data, anchor }: Props) {
   const sources = useMemo(() => distinctSources(data.mb_orders), [data.mb_orders]);
 
@@ -165,14 +139,12 @@ export function BusinessDashboard({ data, anchor }: Props) {
                   value={intFmt(installs)}
                   delta={deltaStr(installs, priorInstalls)}
                   formula="Σ af_daily.installs"
-                  formulaNote="From AppsFlyer daily grain. Ad-side."
                 />
                 <KpiTile
                   label="Sign-Ups"
                   value={intFmt(totalSignups)}
                   delta={deltaStr(totalSignups, priorSignups)}
                   formula="Σ mb_signups_daily.signups"
-                  formulaNote="From signups tab. Additive across days."
                 />
                 <KpiTile
                   label={
@@ -186,28 +158,25 @@ export function BusinessDashboard({ data, anchor }: Props) {
                     ctx.grossNet === "net" ? "Net = Gross / 1.18" : undefined
                   }
                   formula={collectionFormula(ctx.grossNet)}
-                  formulaNote="price in mb_orders is already NET of coupon."
                 />
                 <KpiTile
                   label="Paid Users"
                   value={intFmt(payers)}
                   delta={deltaStr(payers, priorPayers)}
-                  formula="|Unique userids|"
-                  formulaNote="Recomputed via Set, never summed across days."
+                  formula="unique userids"
                 />
                 <KpiTile
                   label="ARPU"
                   value={inr(arpuVal)}
                   delta={deltaStr(arpuVal, priorArpu)}
-                  formula={arpuFormula(ctx.grossNet)}
+                  formula={`net collection / orders`}
                 />
                 <KpiTile
                   label="Conversion"
                   value={pct(conv, 2)}
                   delta={deltaStr(conv, priorConv)}
                   hint="Period-based"
-                  formula={conversionFormula()}
-                  formulaNote="Period-based: payers and signups in the same window."
+                  formula="payers / signups"
                 />
               </div>
             </Section>
@@ -218,30 +187,28 @@ export function BusinessDashboard({ data, anchor }: Props) {
                   emphasis="secondary"
                   label="Discount Given"
                   value={inr(discountGiven(ordersRange))}
-                  formula={discountGivenFormula()}
-                  formulaNote="Raw coupon_discount field; not divided by 1.18."
+                  formula="Σ order.coupon_discount"
                 />
                 <KpiTile
                   emphasis="secondary"
                   label="List Value"
                   value={inr(listValue(ordersRange))}
                   hint="price + coupon_discount"
-                  formula={listValueFormula(ctx.grossNet)}
+                  formula="Σ (price + coupon_discount)"
                 />
                 <KpiTile
                   emphasis="secondary"
                   label="Avg Order Value"
                   value={inr(aov)}
                   delta={deltaStr(aov, priorAov)}
-                  formula={aovFormula(ctx.grossNet)}
+                  formula="net collection / orders"
                 />
                 <KpiTile
                   emphasis="secondary"
                   label="Refund Rate"
                   value="0%"
                   hint="No refund data exists"
-                  formula="hardcoded 0%"
-                  formulaNote="No refund data exists for GyaanE — confirmed, not a gap to fix later."
+                  formula="0% (no refund data)"
                 />
               </div>
             </Section>

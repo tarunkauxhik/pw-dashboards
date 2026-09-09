@@ -29,14 +29,7 @@ export function RevenueByChannelChart({ data, coveragePct }: Props) {
   if (data.length === 0) {
     return (
       <Card>
-        <CardHeader
-          action={
-            <FormulaInfo
-              formula="Σ order.price per media_source bucket"
-              note="ATTRIBUTION_MISSING is its own bar; never folded into Organic."
-            />
-          }
-        >
+        <CardHeader action={<FormulaInfo formula="Σ order.price per media_source" />}>
           <CardTitle>Revenue by Channel</CardTitle>
           <CardDescription>
             Channel data covers —% of paying users. The remainder is
@@ -55,14 +48,7 @@ export function RevenueByChannelChart({ data, coveragePct }: Props) {
 
   return (
     <Card>
-      <CardHeader
-        action={
-          <FormulaInfo
-            formula="Σ order.price per media_source bucket"
-            note="Joined via mb_paid_user_attribution.userid → media_source. PAYMENT-only orders (sources toggle). Coverage = covered payers ÷ total payers."
-          />
-        }
-      >
+      <CardHeader action={<FormulaInfo formula="Σ order.price per media_source" />}>
         <CardTitle>Revenue by Channel</CardTitle>
         <CardDescription>
           Channel data covers <span className="font-medium tabular-nums">{coverageLabel}</span> of paying users. The remainder is

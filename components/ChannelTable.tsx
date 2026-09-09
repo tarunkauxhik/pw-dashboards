@@ -10,8 +10,8 @@ import {
   TableHeader,
   TableRow,
 } from "./ui/table";
-import { cn } from "@/lib/utils";
 import { FormulaInfo } from "./FormulaInfo";
+import { cn } from "@/lib/utils";
 import { inr, intFmt, pct } from "@/lib/format";
 import type { AppsFlyerRow } from "@/types/sheet";
 
@@ -74,23 +74,14 @@ export function ChannelTable({ rows }: { rows: AppsFlyerRow[] }) {
   return (
     <Card>
       <CardContent className="space-y-4 pt-5">
-        <div className="flex items-center justify-end">
-          <FormulaInfo
-            formula="Group Σ af_daily.{installs, cost_inr, impressions, clicks}"
-            note="Grouped by media_source. CTR = Σ clicks ÷ Σ impressions."
-          />
-        </div>
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>
-                <SortButton
-                  active={sortKey === "media_source"}
-                  dir={sortDir}
-                  onClick={() => toggleSort("media_source")}
-                >
+                <span className="inline-flex items-center gap-1">
                   Media Source
-                </SortButton>
+                  <FormulaInfo formula="Σ af_daily.* per media_source" />
+                </span>
               </TableHead>
               <TableHead className="text-right">
                 <SortButton
@@ -111,13 +102,10 @@ export function ChannelTable({ rows }: { rows: AppsFlyerRow[] }) {
                 </SortButton>
               </TableHead>
               <TableHead className="text-right">
-                <SortButton
-                  active={sortKey === "ctr"}
-                  dir={sortDir}
-                  onClick={() => toggleSort("ctr")}
-                >
+                <span className="inline-flex items-center gap-1">
                   CTR
-                </SortButton>
+                  <FormulaInfo formula="Σ clicks ÷ Σ impressions" />
+                </span>
               </TableHead>
             </TableRow>
           </TableHeader>

@@ -20,14 +20,7 @@ import type { BuyTypeRow } from "@/types/sheet";
 export function BuyTypeTable({ rows }: { rows: BuyTypeRow[] }) {
   return (
     <Card>
-      <CardHeader
-        action={
-          <FormulaInfo
-            formula="Σ mb_buy_type.overall_rev"
-            note="Subscription-record value, not collected revenue. Includes trial-priced rows."
-          />
-        }
-      >
+      <CardHeader action={<FormulaInfo formula="Σ mb_buy_type.overall_rev" />}>
         <CardTitle>Buy Type Mix</CardTitle>
         <CardDescription>
           Subscription-record value, not collected revenue — includes
