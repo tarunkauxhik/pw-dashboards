@@ -1,0 +1,14 @@
+# .github/workflows/keep-warm.yml
+name: Keep dashboard warm
+on:
+  schedule:
+    - cron: '*/5 6-18 * * *'   # every 5 min, 6AM-6PM UTC — adjust to IST hours
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -s https://gyaane.vercel.app/business > /dev/null
+      - run: curl -s https://gyaane.vercel.app/business-graphs > /dev/null
+      - run: curl -s https://gyaane.vercel.app/marketing > /dev/null
+      - run: curl -s https://gyaane.vercel.app/push > /dev/null
+      - run: curl -s https://gyaane.vercel.app/pwlive > /dev/null
