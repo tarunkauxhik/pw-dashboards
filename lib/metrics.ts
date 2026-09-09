@@ -82,6 +82,44 @@ export function revenueByCoupon(
     .sort((a, b) => b.orders - a.orders);
 }
 
+/**
+ * For each distinct price point, count distinct userids, total orders,
+ * and sum revenue (already Net/Gross-projected by the caller).
+ *
+ * Buyers always count from raw price — toggling Net/Gross is a display
+ * concern (revenue, avg per buyer), not a definition concern for who's
+ * a customer at a given price. Pass raw rows to this function.
+ */
+export function revenueByPricePoint(
+  orders: OrderRow[],
+): {
+  price: number;
+  buyers: number;
+  orders: number;
+  revenue: number;
+}[] {
+  const map = new Map<
+    number,
+    { buyers: Set<string>; orders: number; revenue: number }
+  >();
+  for (const o of orders) {
+    const cur =
+      map.get(o.price) ?? { buyers: new Set(), orders: 0, revenue: 0 };
+    cur.buyers.add(o.userid);
+    cur.orders += 1;
+    cur.revenue += o.price;
+    map.set(o.price, cur);
+  }
+  return [...map.entries()]
+    .map(([price, v]) => ({
+      price,
+      buyers: v.buyers.size,
+      orders: v.orders,
+      revenue: v.revenue,
+    }))
+    .sort((a, b) => a.price - b.price);
+}
+
 export function cac(orders: OrderRow[], afRows: AppsFlyerRow[]): number {
   const cost = afRows.reduce((sum, r) => sum + r.cost_inr, 0);
   const installs = afRows.reduce((sum, r) => sum + r.installs, 0);

@@ -135,8 +135,10 @@ export function ChannelTable({ rows }: { rows: AppsFlyerRow[] }) {
         </Table>
         <p className="text-[11px] text-muted-foreground">
           Some rows above are promotional coupon codes (e.g. SPIN15,
-          JANMASHTAMI) that have leaked into channel attribution — a known
-          tracking bug, not a real acquisition channel.
+          JANMASHTAMI) that show up under channel attribution. This is a
+          known property of the channel-attribution pipeline — not a
+          tracking bug — and these rows should be read as artefacts of the
+          data, not as real acquisition channels.
         </p>
       </CardContent>
     </Card>

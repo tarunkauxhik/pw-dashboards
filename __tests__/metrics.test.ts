@@ -18,6 +18,7 @@ import {
   revenueByChannel,
   revenueByCoupon,
   revenueByPlatform,
+  revenueByPricePoint,
 } from "@/lib/metrics";
 
 function o(partial: Partial<OrderRow>): OrderRow {
@@ -207,5 +208,38 @@ describe("weekly paidUsers", () => {
     ];
     expect(orders.length).toBe(2);
     expect(paidUsers(orders)).toBe(1);
+  });
+});
+
+describe("revenueByPricePoint", () => {
+  it("groups buyers, orders, revenue per price point, ascending", () => {
+    const orders = [
+      o({ userid: "u1", price: 749 }),
+      o({ userid: "u2", price: 749 }),
+      o({ userid: "u1", price: 749 }), // same user, second order at same price
+      o({ userid: "u3", price: 699 }),
+      o({ userid: "u4", price: 99 }),
+    ];
+    const r = revenueByPricePoint(orders);
+    expect(r).toEqual([
+      { price: 99, buyers: 1, orders: 1, revenue: 99 },
+      { price: 699, buyers: 1, orders: 1, revenue: 699 },
+      { price: 749, buyers: 2, orders: 3, revenue: 749 * 3 },
+    ]);
+  });
+
+  it("buyers counts unique userids only (no double-count across repeat buyers)", () => {
+    const orders = [
+      o({ userid: "u1", price: 749 }),
+      o({ userid: "u1", price: 749 }),
+      o({ userid: "u1", price: 749 }),
+    ];
+    const [row] = revenueByPricePoint(orders);
+    expect(row.buyers).toBe(1);
+    expect(row.orders).toBe(3);
+  });
+
+  it("returns empty array for empty input", () => {
+    expect(revenueByPricePoint([])).toEqual([]);
   });
 });

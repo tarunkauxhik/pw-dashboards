@@ -373,7 +373,35 @@ Simple table from `mb_buy_type`: plantype | distinct_ids | overall_rev.
 Caption underneath: "Subscription-record value, not collected revenue —
 includes trial-priced rows. Not comparable to Collection above."
 
-### 6.5 Breakdown charts
+### 6.5 Plan Price View (how many users & revenue per distinct `price`)
+A section that answers: at each price point the app is sold at, how many
+distinct paying users chose it in the selected period, and what revenue
+did that price point generate.
+
+Layout: a table plus a small horizontal bar chart, side-by-side.
+
+| Column | Definition |
+|---|---|
+| Price (Rs) | `order.price` value, formatted as Indian rupees (`Intl.NumberFormat('en-IN')`). Sorted ascending by price. |
+| Buyers | Count of **distinct userids** at this price point in the selected period. Recomputed via `Set`, never summed across days. |
+| Orders | Count of order rows at this price point in the selected period. Safe to sum. |
+| Revenue | Σ `order.price` at this price point in the selected period. Net-aware: `/1.18` when toggle is Net. |
+| Avg per buyer | Revenue / Buyers. Arithmetic average across the people who paid this price. |
+
+Behaviour:
+- Source rows are `mb_orders` filtered by the same `[from, to]` range as
+  every other section above, and filtered by the same source
+  multi-select (so toggling ADMIN off removes ADMIN-priced rows). Net/Net
+  toggle applies (price projected the same way as Collection). Buyers is
+  always computed from the **raw** price (not the projected net price) so
+  toggling does not double-count users.
+
+Caption (always visible under the table):
+"Buyer counts use the raw `order.price` value (they do not double-count
+across Gross/Net toggles). Only Revenue and Avg per buyer flip with the
+toggle."
+
+### 6.6 Breakdown charts
 - Revenue by platform (`revenueByPlatform`) — donut or bar
 - Revenue by payment gateway/method — bar
 - Top coupons (`revenueByCoupon`, top 10 by orders) — table
@@ -390,10 +418,14 @@ Installs, Total Ad Cost (Rs, from `af_daily`), CAC (`cac()`), Paid Users
 From `af_daily`: media_source | installs | cost | CTR (`clicks/impressions`).
 Sortable. Default sort: cost descending.
 
-Known data issue to display as a footnote under this table:
-"Some rows above are promotional coupon codes (e.g. SPIN15, JANMASHTAMI)
-that have leaked into channel attribution — a known tracking bug, not a
-real acquisition channel."
+Caption displayed above this table (not a bug warning — a known behaviour
+that the dashboard must surface, not hide):
+
+> Some rows above are promotional coupon codes (e.g. SPIN15, JANMASHTAMI)
+> that show up under channel attribution. This is a known property of
+> the channel-attribution pipeline — not a tracking bug — and these
+> rows should be read as artefacts of the data, not as real acquisition
+> channels.
 
 ### 7.3 Revenue by channel (`revenueByChannel`)
 Bar chart, channels sorted by revenue. "ATTRIBUTION_MISSING" must be its

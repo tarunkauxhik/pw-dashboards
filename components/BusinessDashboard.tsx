@@ -5,6 +5,7 @@ import { DashboardToolbar } from "./DashboardToolbar";
 import { KpiTile } from "./KpiTile";
 import { TrendSection } from "./TrendSection";
 import { BuyTypeTable } from "./BuyTypeTable";
+import { PlanPriceView } from "./PlanPriceView";
 import { PlatformRevenueChart } from "./PlatformRevenueChart";
 import { GatewayRevenueChart } from "./GatewayRevenueChart";
 import { TopCouponsTable } from "./TopCouponsTable";
@@ -16,6 +17,7 @@ import {
   conversionRate,
   discountGiven,
   listValue,
+  revenueByPricePoint,
 } from "@/lib/metrics";
 import {
   byAfDateRange,
@@ -242,6 +244,13 @@ export function BusinessDashboard({ data, anchor }: Props) {
 
             <Section title="Buy Type Mix">
               <BuyTypeTable rows={data.mb_buy_type} />
+            </Section>
+
+            <Section title="Plan Price View">
+              <PlanPriceView
+                rows={revenueByPricePoint(baseOrdersRange)}
+                grossNet={ctx.grossNet}
+              />
             </Section>
 
             <Section title="Revenue Breakdown">
