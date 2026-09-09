@@ -1,6 +1,6 @@
 import { DashboardShell } from "@/components/DashboardShell";
 import { StatusBar } from "@/components/StatusBar";
-import { getCachedSheet } from "@/lib/sheet";
+import { getCachedSheet, staleReason } from "@/lib/sheet";
 import { getAnchorDate } from "@/lib/dateRanges";
 import { MarketingDashboard } from "@/components/MarketingDashboard";
 
@@ -13,16 +13,16 @@ export default async function MarketingPage() {
     data._meta.length > 0
       ? getAnchorDate(data._meta)
       : snap.fetchedAtIso.slice(0, 10);
-  const sidebarMeta = {
-    lastRefreshedIso: snap.ok ? snap.fetchedAtIso : null,
-    isStale: !snap.ok || data._meta.some((m) => m.status !== "OK"),
-  };
+  const stale = staleReason(snap);
 
   return (
     <DashboardShell
       title="Marketing"
       subtitle="Acquisition channels, ad spend, and attributed revenue."
-      sidebarMeta={sidebarMeta}
+      sidebarMeta={{
+        lastRefreshedIso: snap.ok ? snap.fetchedAtIso : null,
+        stale,
+      }}
       statusBar={
         <StatusBar
           meta={data._meta}
@@ -31,12 +31,11 @@ export default async function MarketingPage() {
         />
       }
     >
-      {data.af_daily.length === 0 && data._meta.length === 0 ? (
+      {data.af_daily.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border/60 bg-card/40 p-6 text-sm text-muted-foreground">
-          <div className="font-medium text-foreground">No snapshot yet</div>
+          <div className="font-medium text-foreground">No data yet</div>
           <p className="mt-1">
-            Use the refresh button at the top of the sidebar to fetch the
-            Sheet snapshot for the first time.
+            Hit the refresh button in the sidebar to fetch the first snapshot.
           </p>
         </div>
       ) : (

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Sidebar } from "./Sidebar";
 import { Breadcrumbs } from "./Breadcrumbs";
+import type { StaleReason } from "@/lib/sheet";
 
 export function DashboardShell({
   title,
@@ -12,14 +13,14 @@ export function DashboardShell({
   title: string;
   subtitle: string;
   statusBar?: ReactNode;
-  sidebarMeta?: { lastRefreshedIso: string | null; isStale: boolean };
+  sidebarMeta?: { lastRefreshedIso: string | null; stale: StaleReason };
   children: ReactNode;
 }) {
   return (
     <div className="flex min-h-screen">
       <Sidebar
         lastRefreshedIso={sidebarMeta?.lastRefreshedIso ?? null}
-        isStale={sidebarMeta?.isStale ?? false}
+        stale={sidebarMeta?.stale ?? "never-fetched"}
       />
       <main className="flex-1 md:pl-[240px]">
         <div className="mx-auto w-full max-w-[1400px] space-y-6 p-6 md:p-8">

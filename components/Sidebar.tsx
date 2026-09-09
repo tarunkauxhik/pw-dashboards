@@ -11,6 +11,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { StaleReason } from "@/lib/sheet";
 
 const NAV = [
   { href: "/business", label: "Business", icon: Gauge },
@@ -18,12 +19,23 @@ const NAV = [
   { href: "/push", label: "Push", icon: Megaphone },
 ] as const;
 
+const STALE_LABEL: Record<
+  StaleReason,
+  { text: string; tone: "ok" | "warn" | "bad" }
+> = {
+  fresh: { text: "Snapshot fresh", tone: "ok" },
+  "data-source-not-ok": { text: "API reported issues", tone: "warn" },
+  "snapshot-too-old": { text: "Snapshot is old", tone: "warn" },
+  "fetch-failed": { text: "Refresh failed", tone: "warn" },
+  "never-fetched": { text: "No snapshot yet", tone: "warn" },
+};
+
 export function Sidebar({
   lastRefreshedIso,
-  isStale,
+  stale,
 }: {
   lastRefreshedIso: string | null;
-  isStale: boolean;
+  stale: StaleReason;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -40,23 +52,31 @@ export function Sidebar({
   const handleRefresh = () => {
     startTransition(async () => {
       const t0 = Date.now();
-      const res = await fetch("/api/sheet-refresh", { method: "POST" });
+      const res = await fetch("/api/sheet-refresh", {
+        method: "POST",
+        cache: "no-store",
+      });
       await res.json().catch(() => null);
       const elapsed = Date.now() - t0;
-      // Always revalidate, regardless of success/failure.
       router.refresh();
-      console.info(
-        `[refresh] ${res.ok ? "ok" : "fail"} in ${elapsed}ms`,
-      );
+      console.info(`[refresh] ${res.ok ? "ok" : "fail"} in ${elapsed}ms`);
     });
   };
 
   const refreshedLabel =
     lastRefreshedIso && now !== null
       ? formatRelative(lastRefreshedIso, now)
-      : "loading…";
+      : "—";
 
-  void tickNow; // re-trigger relative format on interval
+  void tickNow;
+
+  const meta = STALE_LABEL[stale];
+  const dotClass =
+    meta.tone === "ok"
+      ? "bg-emerald-500"
+      : meta.tone === "warn"
+        ? "bg-amber-500"
+        : "bg-red-500";
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-[240px] flex-col border-r border-border/60 bg-card/30 backdrop-blur md:flex">
@@ -72,19 +92,10 @@ export function Sidebar({
       <div className="border-b border-border/60 px-4 py-3">
         <div className="flex items-center gap-2">
           <span
-            className={cn(
-              "inline-flex h-1.5 w-1.5 rounded-full",
-              isStale
-                ? "bg-amber-500"
-                : lastRefreshedIso
-                  ? "bg-emerald-500"
-                  : "bg-muted-foreground/40",
-            )}
+            className={cn("inline-flex h-1.5 w-1.5 rounded-full", dotClass)}
             aria-hidden
           />
-          <span className="text-xs font-medium tracking-tight">
-            {isStale ? "Stale snapshot" : "Snapshot fresh"}
-          </span>
+          <span className="text-xs font-medium tracking-tight">{meta.text}</span>
           <button
             type="button"
             onClick={handleRefresh}
@@ -103,7 +114,7 @@ export function Sidebar({
           </button>
         </div>
         <div className="mt-1 text-[11px] text-muted-foreground tabular-nums">
-          {lastRefreshedIso ? `Refreshed ${refreshedLabel}` : "—"}
+          {lastRefreshedIso ? `API hit ${refreshedLabel}` : "—"}
         </div>
       </div>
       <nav className="flex flex-1 flex-col gap-0.5 p-3">
