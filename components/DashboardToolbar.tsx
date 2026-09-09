@@ -10,6 +10,7 @@ interface Props {
   sourceOptions: string[];
   defaultExcluded: string[];
   showGrossNet?: boolean;
+  showSources?: boolean;
   children: (ctx: {
     period: Period;
     grossNet: GrossNet;
@@ -21,6 +22,7 @@ export function DashboardToolbar({
   sourceOptions,
   defaultExcluded,
   showGrossNet = true,
+  showSources = sourceOptions.length > 0,
   children,
 }: Props) {
   const [periodKind, setPeriodKind] = useState<PeriodKind>("last30");
@@ -59,11 +61,13 @@ export function DashboardToolbar({
           {showGrossNet && (
             <GrossNetToggle value={grossNet} onChange={setGrossNet} />
           )}
-          <SourceMultiSelect
-            options={sourceOptions}
-            excluded={excludedSources}
-            onChange={setExcludedSources}
-          />
+          {showSources && (
+            <SourceMultiSelect
+              options={sourceOptions}
+              excluded={excludedSources}
+              onChange={setExcludedSources}
+            />
+          )}
         </div>
       </div>
       {children(ctx)}
