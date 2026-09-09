@@ -31,7 +31,6 @@ import type { OrderRow, SheetData } from "@/types/sheet";
 
 interface Props {
   data: SheetData;
-  anchor: string;
 }
 
 const DEFAULT_EXCLUDED = ["ADMIN", "PW_PLAN"];
@@ -69,16 +68,17 @@ function collectionFormula(grossNet: GrossNet): string {
     : "Σ order.price";
 }
 
-export function BusinessDashboard({ data, anchor }: Props) {
+export function BusinessDashboard({ data }: Props) {
   const sources = useMemo(() => distinctSources(data.mb_orders), [data.mb_orders]);
 
   return (
     <DashboardToolbar
+      data={data}
       sourceOptions={sources}
       defaultExcluded={DEFAULT_EXCLUDED}
     >
       {(ctx) => {
-        const range = resolvePeriod(ctx.period, anchor);
+        const range = resolvePeriod(ctx.period, ctx.anchor);
         const prior = priorPeriod(range);
 
         const baseOrdersRange = applySourceFilter(

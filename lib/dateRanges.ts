@@ -2,9 +2,22 @@ import type { MetaRow } from "@/types/sheet";
 
 export type Period =
   | { kind: "last7" }
-  | { kind: "last30" }
   | { kind: "thisMonth" }
+  | { kind: "prevMonth" }
+  | { kind: "month"; ym: string }
+  | { kind: "ytd"; fyStartYear: number }
   | { kind: "custom"; from: string; to: string };
+
+export const PERIOD_KINDS = [
+  "last7",
+  "thisMonth",
+  "prevMonth",
+  "month",
+  "ytd",
+  "custom",
+] as const;
+
+export type PeriodKind = (typeof PERIOD_KINDS)[number];
 
 export interface DateRange {
   from: string;
@@ -43,27 +56,78 @@ function dayDiff(from: string, to: string): number {
   return Math.round((b - a) / 86400000);
 }
 
-export function resolvePeriod(period: Period, anchor: string): DateRange {
-  switch (period.kind) {
-    case "last7":
-      return { from: addDays(anchor, -6), to: anchor };
-    case "last30":
-      return { from: addDays(anchor, -29), to: anchor };
-    case "thisMonth": {
-      const [y, m] = anchor.split("-").map(Number);
-      const first = `${y}-${String(m).padStart(2, "0")}-01`;
-      return { from: first, to: anchor };
-    }
-    case "custom":
-      return { from: period.from, to: period.to };
-  }
+/**
+ * Last day of a calendar month, e.g. lastDayOfMonth("2026-05") → "2026-05-31".
+ * Uses the JS Date quirk: monthIndex = month (1-12); day = 0 means
+ * "last day before the 1st of next month", which is the last day of the
+ * requested month.
+ */
+export function lastDayOfMonth(ym: string): string {
+  const [y, m] = ym.split("-").map(Number);
+  const last = new Date(Date.UTC(y, m, 0));
+  const yy = last.getUTCFullYear();
+  const mm = String(last.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(last.getUTCDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
 }
 
+/**
+ * Convert a `DateRange` to a "previous equal-length window" by shifting
+ * it back by exactly `days(range) + 1` calendar days. This is the
+ * comparison window shown on KPI deltas.
+ *
+ * Note: for ranges that don't align to a clean year boundary (e.g. a
+ * 365-day FY range), the prior window will be off by ~1 day vs the
+ * strictly-equal "same dates a year earlier". Acceptable for the
+ * internal deltas; the raw values are still correct.
+ */
 export function priorPeriod(range: DateRange): DateRange {
   const days = dayDiff(range.from, range.to);
   const priorTo = addDays(range.from, -1);
   const priorFrom = addDays(priorTo, -days);
   return { from: priorFrom, to: priorTo };
+}
+
+export function resolvePeriod(period: Period, anchor: string): DateRange {
+  switch (period.kind) {
+    case "last7":
+      return { from: addDays(anchor, -6), to: anchor };
+    case "thisMonth": {
+      const [y, m] = anchor.split("-").map(Number);
+      const first = `${y}-${String(m).padStart(2, "0")}-01`;
+      return { from: first, to: anchor };
+    }
+    case "prevMonth": {
+      // First day of this month, then step back 1 day → last day of prev month.
+      const [y, m] = anchor.split("-").map(Number);
+      const firstOfThis = `${y}-${String(m).padStart(2, "0")}-01`;
+      const lastOfPrev = addDays(firstOfThis, -1);
+      const [py, pm] = lastOfPrev.split("-").map(Number);
+      return {
+        from: `${py}-${String(pm).padStart(2, "0")}-01`,
+        to: lastOfPrev,
+      };
+    }
+    case "month": {
+      const ym = period.ym;
+      const first = `${ym}-01`;
+      const last = lastDayOfMonth(ym);
+      // For the current calendar month, clamp `to` to the anchor so a
+      // mid-month selection stops at "today" rather than running ahead
+      // into the future.
+      const to = last > anchor ? anchor : last;
+      return { from: first, to };
+    }
+    case "ytd": {
+      const start = fyStartDate(period.fyStartYear);
+      const end = fyEndDate(period.fyStartYear);
+      // Clamp to anchor if the FY end is in the future (i.e. current FY).
+      const to = end > anchor ? anchor : end;
+      return { from: start, to };
+    }
+    case "custom":
+      return { from: period.from, to: period.to };
+  }
 }
 
 export function isoWeekKey(isoDate: string): string {

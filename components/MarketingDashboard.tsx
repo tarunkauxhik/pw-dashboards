@@ -22,7 +22,6 @@ import type { OrderRow, SheetData } from "@/types/sheet";
 
 interface Props {
   data: SheetData;
-  anchor: string;
 }
 
 const DEFAULT_EXCLUDED = ["ADMIN", "PW_PLAN"];
@@ -39,17 +38,18 @@ function applySourceFilter(
   return orders.filter((o) => includeSources.has(o.source));
 }
 
-export function MarketingDashboard({ data, anchor }: Props) {
+export function MarketingDashboard({ data }: Props) {
   const sources = useMemo(() => distinctSources(data.mb_orders), [data.mb_orders]);
 
   return (
     <DashboardToolbar
+      data={data}
       sourceOptions={sources}
       defaultExcluded={DEFAULT_EXCLUDED}
       showGrossNet={false}
     >
       {(ctx) => {
-        const range = resolvePeriod(ctx.period, anchor);
+        const range = resolvePeriod(ctx.period, ctx.anchor);
         const prior = priorPeriod(range);
 
         const ordersRange = applySourceFilter(

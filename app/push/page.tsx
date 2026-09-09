@@ -42,9 +42,6 @@ export default async function PushPage() {
   }
 
   const data = result.data;
-  const anchorDate = data._meta
-    .map((m) => m.data_as_of_ist.slice(0, 10))
-    .sort()[0] ?? result.fetchedAtIso.slice(0, 10);
   const freshness = computeFreshness({
     ok: true,
     fetchedAtIso: result.fetchedAtIso,
@@ -85,7 +82,7 @@ export default async function PushPage() {
           </p>
         </div>
       ) : (
-        <PushDashboard data={data} anchor={anchorDate} />
+        <PushDashboard data={data} />
       )}
     </DashboardShell>
   );

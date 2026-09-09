@@ -42,16 +42,11 @@ export default async function BusinessPage() {
   }
 
   const data = result.data;
-  const anchorIso = data._meta.length > 0 ? null : null;
-  void anchorIso;
-  const anchor = freshAnchorDate(result.fetchedAtIso, data._meta);
-  const freshness = computeFreshness(
-    {
-      ok: true,
-      fetchedAtIso: result.fetchedAtIso,
-      data: { _meta: data._meta },
-    },
-  );
+  const freshness = computeFreshness({
+    ok: true,
+    fetchedAtIso: result.fetchedAtIso,
+    data: { _meta: data._meta },
+  });
 
   return (
     <DashboardShell
@@ -84,21 +79,9 @@ export default async function BusinessPage() {
           </p>
         </div>
       ) : (
-        <BusinessDashboard data={data} anchor={anchor} />
+        <BusinessDashboard data={data} />
       )}
     </DashboardShell>
   );
 }
 
-function freshAnchorDate(
-  fetchedAtIso: string,
-  meta: { data_as_of_ist: string }[],
-): string {
-  if (meta.length > 0) {
-    const dates = [
-      ...new Set(meta.map((m) => m.data_as_of_ist.slice(0, 10))),
-    ].sort();
-    return dates[dates.length - 1] ?? fetchedAtIso.slice(0, 10);
-  }
-  return fetchedAtIso.slice(0, 10);
-}

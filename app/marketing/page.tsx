@@ -42,7 +42,6 @@ export default async function MarketingPage() {
   }
 
   const data = result.data;
-  const anchor = freshAnchorDate(result.fetchedAtIso, data._meta);
   const freshness = computeFreshness({
     ok: true,
     fetchedAtIso: result.fetchedAtIso,
@@ -80,21 +79,9 @@ export default async function MarketingPage() {
           </p>
         </div>
       ) : (
-        <MarketingDashboard data={data} anchor={anchor} />
+        <MarketingDashboard data={data} />
       )}
     </DashboardShell>
   );
 }
 
-function freshAnchorDate(
-  fetchedAtIso: string,
-  meta: { data_as_of_ist: string }[],
-): string {
-  if (meta.length > 0) {
-    const dates = [
-      ...new Set(meta.map((m) => m.data_as_of_ist.slice(0, 10))),
-    ].sort();
-    return dates[dates.length - 1] ?? fetchedAtIso.slice(0, 10);
-  }
-  return fetchedAtIso.slice(0, 10);
-}

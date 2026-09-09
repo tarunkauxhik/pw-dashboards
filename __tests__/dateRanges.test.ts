@@ -10,6 +10,7 @@ import {
   fyStartDate,
   getAnchorDate,
   isoWeekKey,
+  lastDayOfMonth,
   monthKey,
   priorPeriod,
   resolvePeriod,
@@ -54,16 +55,62 @@ describe("resolvePeriod", () => {
     });
   });
 
-  it("last30: 29 days back inclusive", () => {
-    expect(resolvePeriod({ kind: "last30" }, "2026-09-08")).toEqual({
-      from: "2026-08-10",
+  it("thisMonth: first-of-month through anchor", () => {
+    expect(resolvePeriod({ kind: "thisMonth" }, "2026-09-08")).toEqual({
+      from: "2026-09-01",
       to: "2026-09-08",
     });
   });
 
-  it("thisMonth: first-of-month through anchor", () => {
-    expect(resolvePeriod({ kind: "thisMonth" }, "2026-09-08")).toEqual({
-      from: "2026-09-01",
+  it("prevMonth: full previous calendar month", () => {
+    expect(resolvePeriod({ kind: "prevMonth" }, "2026-09-08")).toEqual({
+      from: "2026-08-01",
+      to: "2026-08-31",
+    });
+  });
+
+  it("prevMonth handles month-boundary edge cases", () => {
+    // Anchor in January — prev month is December of previous year.
+    expect(resolvePeriod({ kind: "prevMonth" }, "2026-01-15")).toEqual({
+      from: "2025-12-01",
+      to: "2025-12-31",
+    });
+    // Anchor in April — prev month is March.
+    expect(resolvePeriod({ kind: "prevMonth" }, "2026-04-20")).toEqual({
+      from: "2026-03-01",
+      to: "2026-03-31",
+    });
+  });
+
+  it("month: spans the full month, clamped to anchor for the current month", () => {
+    // Past month: full range
+    expect(
+      resolvePeriod({ kind: "month", ym: "2026-05" }, "2026-09-08"),
+    ).toEqual({ from: "2026-05-01", to: "2026-05-31" });
+    // Current month: ends at anchor
+    expect(
+      resolvePeriod({ kind: "month", ym: "2026-09" }, "2026-09-08"),
+    ).toEqual({ from: "2026-09-01", to: "2026-09-08" });
+  });
+
+  it("month handles Feb in a leap year and a non-leap year", () => {
+    expect(
+      resolvePeriod({ kind: "month", ym: "2024-02" }, "2024-06-01"),
+    ).toEqual({ from: "2024-02-01", to: "2024-02-29" });
+    expect(
+      resolvePeriod({ kind: "month", ym: "2026-02" }, "2026-06-01"),
+    ).toEqual({ from: "2026-02-01", to: "2026-02-28" });
+  });
+
+  it("ytd: full FY for past FYs, clamped for current FY", () => {
+    // Past FY: full range
+    expect(resolvePeriod({ kind: "ytd", fyStartYear: 2025 }, "2026-09-08")).toEqual({
+      from: "2025-04-01",
+      to: "2026-03-31",
+    });
+    // Current FY: clamped to anchor
+    expect(resolvePeriod({ kind: "ytd", fyStartYear: 2026 }, "2026-09-08")).toEqual({
+      from: "2026-04-01",
       to: "2026-09-08",
     });
   });
@@ -75,6 +122,16 @@ describe("resolvePeriod", () => {
         "2026-09-08",
       ),
     ).toEqual({ from: "2026-01-01", to: "2026-01-31" });
+  });
+});
+
+describe("lastDayOfMonth", () => {
+  it("returns the last day of the requested month", () => {
+    expect(lastDayOfMonth("2026-01")).toBe("2026-01-31");
+    expect(lastDayOfMonth("2026-02")).toBe("2026-02-28");
+    expect(lastDayOfMonth("2024-02")).toBe("2024-02-29");
+    expect(lastDayOfMonth("2026-04")).toBe("2026-04-30");
+    expect(lastDayOfMonth("2026-12")).toBe("2026-12-31");
   });
 });
 

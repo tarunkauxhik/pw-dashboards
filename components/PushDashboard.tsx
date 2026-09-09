@@ -21,18 +21,18 @@ import type { SheetData } from "@/types/sheet";
 
 interface Props {
   data: SheetData;
-  anchor: string;
 }
 
-export function PushDashboard({ data, anchor }: Props) {
+export function PushDashboard({ data }: Props) {
   return (
     <DashboardToolbar
+      data={data}
       sourceOptions={[]}
       defaultExcluded={[]}
       showGrossNet={false}
     >
       {(ctx) => {
-        const range = resolvePeriod(ctx.period, anchor);
+        const range = resolvePeriod(ctx.period, ctx.anchor);
         const prior = priorPeriod(range);
         const push = byPushDateRange(data.mb_push_daily, range);
         const pushPrior = byPushDateRange(data.mb_push_daily, prior);
