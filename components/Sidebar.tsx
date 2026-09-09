@@ -9,6 +9,7 @@ import {
   Bell,
   Gauge,
   RefreshCw,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { StaleReason } from "@/lib/sheet";
@@ -18,6 +19,7 @@ const NAV = [
   { href: "/business-graphs", label: "Business Graphs", icon: BarChart3 },
   { href: "/marketing", label: "Marketing", icon: BarChart3 },
   { href: "/push", label: "Push", icon: Megaphone },
+  { href: "/pw-live", label: "pw.live", icon: Sparkles },
 ] as const;
 
 const STALE_LABEL: Record<
