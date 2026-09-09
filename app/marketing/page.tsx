@@ -1,24 +1,60 @@
 import { DashboardShell } from "@/components/DashboardShell";
 import { StatusBar } from "@/components/StatusBar";
-import { getCachedSheet, computeFreshness } from "@/lib/sheet";
+import { fetchSheetCached } from "@/lib/sheet";
+import { computeFreshness } from "@/lib/freshness";
 import { MarketingDashboard } from "@/components/MarketingDashboard";
 
 export const dynamic = "force-dynamic";
 
 export default async function MarketingPage() {
-  const snap = await getCachedSheet();
-  const data = snap.data;
-  const freshness = computeFreshness(snap);
-  const anchor =
-    freshness.anchorDate ??
-    (snap.fetchedAtIso.slice(0, 10) || "1970-01-01");
+  const result = await fetchSheetCached();
+  if (!result.ok || !result.data) {
+    return (
+      <DashboardShell
+        title="Marketing"
+        subtitle="Acquisition channels, ad spend, and attributed revenue."
+        sidebarMeta={{
+          lastRefreshedIso: null,
+          stale: "fetch-failed",
+          sourceFailed: false,
+          isBehindSchedule: false,
+        }}
+        statusBar={
+          <StatusBar
+            meta={[]}
+            refreshError={result.errorMessage ?? "Sheet API unreachable"}
+            fetchDurationMs={result.fetchDurationMs}
+            sourceFailed={false}
+            isBehindSchedule={false}
+            anchorDate={null}
+            expectedThrough={null}
+          />
+        }
+      >
+        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm text-red-900">
+          <div className="font-medium">Failed to load sheet data</div>
+          <p className="mt-1 text-xs text-red-800/90">
+            {result.errorMessage ?? "Unknown error"}.
+          </p>
+        </div>
+      </DashboardShell>
+    );
+  }
+
+  const data = result.data;
+  const anchor = freshAnchorDate(result.fetchedAtIso, data._meta);
+  const freshness = computeFreshness({
+    ok: true,
+    fetchedAtIso: result.fetchedAtIso,
+    data: { _meta: data._meta },
+  });
 
   return (
     <DashboardShell
       title="Marketing"
       subtitle="Acquisition channels, ad spend, and attributed revenue."
       sidebarMeta={{
-        lastRefreshedIso: snap.ok ? snap.fetchedAtIso : null,
+        lastRefreshedIso: result.fetchedAtIso,
         stale: freshness.staleReason,
         sourceFailed: freshness.sourceFailed,
         isBehindSchedule: freshness.isBehindSchedule,
@@ -26,8 +62,8 @@ export default async function MarketingPage() {
       statusBar={
         <StatusBar
           meta={data._meta}
-          refreshError={snap.ok ? null : (snap.errorMessage ?? "unknown")}
-          fetchDurationMs={snap.fetchDurationMs}
+          refreshError={null}
+          fetchDurationMs={result.fetchDurationMs}
           sourceFailed={freshness.sourceFailed}
           isBehindSchedule={freshness.isBehindSchedule}
           anchorDate={freshness.anchorDate}
@@ -39,7 +75,8 @@ export default async function MarketingPage() {
         <div className="rounded-lg border border-dashed border-border/60 bg-card/40 p-6 text-sm text-muted-foreground">
           <div className="font-medium text-foreground">No data yet</div>
           <p className="mt-1">
-            Hit the refresh button in the sidebar to fetch the first snapshot.
+            The Sheet API returned empty rows. Check the Apps Script log or
+            hit the refresh button in the sidebar.
           </p>
         </div>
       ) : (
@@ -47,4 +84,17 @@ export default async function MarketingPage() {
       )}
     </DashboardShell>
   );
+}
+
+function freshAnchorDate(
+  fetchedAtIso: string,
+  meta: { data_as_of_ist: string }[],
+): string {
+  if (meta.length > 0) {
+    const dates = [
+      ...new Set(meta.map((m) => m.data_as_of_ist.slice(0, 10))),
+    ].sort();
+    return dates[dates.length - 1] ?? fetchedAtIso.slice(0, 10);
+  }
+  return fetchedAtIso.slice(0, 10);
 }

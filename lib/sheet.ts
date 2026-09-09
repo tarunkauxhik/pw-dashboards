@@ -1,206 +1,109 @@
 import "server-only";
-import { promises as fs } from "node:fs";
-import path from "node:path";
-import type { MetaRow, SheetData } from "@/types/sheet";
-import type { StaleReason, FreshnessInput } from "./freshness";
+import type { SheetData } from "@/types/sheet";
 
 export type { StaleReason } from "./freshness";
 
-const FETCH_TIMEOUT_MS = 8_000;
-const SNAPSHOT_PATH = path.join(
-  process.cwd(),
-  ".next",
-  "cache",
-  "sheet-snapshot.json",
-);
-const FILE_TTL_MS = 24 * 60 * 60 * 1000;
+const FETCH_TIMEOUT_MS = 15_000;
 
-export interface CachedSheet extends FreshnessInput {
+function sheetUrl(): string {
+  return `${process.env.SHEET_API_URL}?token=${process.env.SHEET_API_TOKEN}`;
+}
+
+function isValidSheet(data: unknown): data is SheetData {
+  if (!data || typeof data !== "object") return false;
+  const d = data as Partial<SheetData>;
+  return (
+    Array.isArray(d._meta) &&
+    Array.isArray(d.mb_orders) &&
+    Array.isArray(d.mb_signups_daily) &&
+    Array.isArray(d.mb_buy_type) &&
+    Array.isArray(d.mb_paid_user_attribution) &&
+    Array.isArray(d.mb_push_daily) &&
+    Array.isArray(d.af_daily)
+  );
+}
+
+export interface SheetFetchResult {
   ok: boolean;
-  errorMessage?: string;
-  fetchedAtIso: string;
+  data: SheetData | null;
+  errorMessage: string | null;
   fetchDurationMs: number;
-  data: SheetData;
-  metaAsOf?: string[];
+  fetchedAtIso: string;
 }
 
-function emptyCachedSheet(ok: boolean, errorMessage?: string): CachedSheet {
-  return {
-    ok,
-    errorMessage,
-    fetchedAtIso: new Date(0).toISOString(),
-    fetchDurationMs: 0,
-    data: {
-      mb_orders: [],
-      mb_signups_daily: [],
-      mb_buy_type: [],
-      mb_paid_user_attribution: [],
-      mb_push_daily: [],
-      af_daily: [],
-      _meta: [],
-    },
-    metaAsOf: [],
-  };
-}
-
-async function readSnapshot(): Promise<CachedSheet | null> {
-  try {
-    const buf = await fs.readFile(SNAPSHOT_PATH, "utf8");
-    const parsed = JSON.parse(buf) as CachedSheet;
-    const age = Date.now() - Date.parse(parsed.fetchedAtIso);
-    if (Number.isNaN(age) || age > FILE_TTL_MS) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-async function writeSnapshot(s: CachedSheet): Promise<void> {
-  await fs.mkdir(path.dirname(SNAPSHOT_PATH), { recursive: true });
-  await fs.writeFile(SNAPSHOT_PATH, JSON.stringify(s), "utf8");
-}
-
-export async function getCachedSheet(): Promise<CachedSheet> {
-  return (await readSnapshot()) ?? emptyCachedSheet(false, "no snapshot yet");
-}
-
-function metaAsOfList(meta: MetaRow[]): string[] {
-  return [...new Set(meta.map((m) => m.data_as_of_ist.slice(0, 10)))].sort();
-}
-
-async function fetchSheetManual(): Promise<
-  | { ok: true; data: SheetData; durationMs: number }
-  | { ok: false; errorMessage: string; durationMs: number }
-> {
-  const url = `${process.env.SHEET_API_URL}?token=${process.env.SHEET_API_TOKEN}`;
+async function fetchOnce(
+  init: RequestInit & { next?: { revalidate: number | false } },
+): Promise<SheetFetchResult> {
+  const url = sheetUrl();
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   const t0 = Date.now();
   try {
-    const res = await fetch(url, {
-      cache: "no-store",
-      signal: controller.signal,
-    });
-    return await parseSheetResponse(res, Date.now() - t0);
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
-async function fetchSheetBackground(): Promise<
-  | { ok: true; data: SheetData; durationMs: number }
-  | { ok: false; errorMessage: string; durationMs: number }
-> {
-  const url = `${process.env.SHEET_API_URL}?token=${process.env.SHEET_API_TOKEN}`;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  const t0 = Date.now();
-  try {
-    // No cache directive: our disk snapshot is the single source of caching.
-    const res = await fetch(url, {
-      signal: controller.signal,
-    });
-    return await parseSheetResponse(res, Date.now() - t0);
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
-async function parseSheetResponse(
-  res: Response,
-  durationMs: number,
-): Promise<
-  | { ok: true; data: SheetData; durationMs: number }
-  | { ok: false; errorMessage: string; durationMs: number }
-> {
-  if (!res.ok) {
+    const res = await fetch(url, { ...init, signal: controller.signal });
+    if (!res.ok) {
+      return {
+        ok: false,
+        data: null,
+        errorMessage: `Sheet API returned ${res.status}`,
+        fetchDurationMs: Date.now() - t0,
+        fetchedAtIso: new Date().toISOString(),
+      };
+    }
+    let body: unknown;
+    try {
+      body = await res.json();
+    } catch (err) {
+      return {
+        ok: false,
+        data: null,
+        errorMessage:
+          err instanceof Error ? `invalid JSON: ${err.message}` : "invalid JSON",
+        fetchDurationMs: Date.now() - t0,
+        fetchedAtIso: new Date().toISOString(),
+      };
+    }
+    if (
+      body &&
+      typeof body === "object" &&
+      "error" in body &&
+      typeof (body as { error: unknown }).error === "string"
+    ) {
+      return {
+        ok: false,
+        data: null,
+        errorMessage: `Sheet API: ${(body as { error: string }).error}`,
+        fetchDurationMs: Date.now() - t0,
+        fetchedAtIso: new Date().toISOString(),
+      };
+    }
+    if (!isValidSheet(body)) {
+      return {
+        ok: false,
+        data: null,
+        errorMessage: "response shape invalid",
+        fetchDurationMs: Date.now() - t0,
+        fetchedAtIso: new Date().toISOString(),
+      };
+    }
     return {
-      ok: false,
-      errorMessage: `Sheet API returned ${res.status}`,
-      durationMs,
-    };
-  }
-  let data: { error?: string } & Partial<SheetData>;
-  try {
-    data = (await res.json()) as { error?: string } & Partial<SheetData>;
-  } catch (err) {
-    return {
-      ok: false,
-      errorMessage:
-        err instanceof Error ? `invalid JSON: ${err.message}` : "invalid JSON",
-      durationMs,
-    };
-  }
-  if (data.error) {
-    return {
-      ok: false,
-      errorMessage: `Sheet API: ${data.error}`,
-      durationMs,
-    };
-  }
-  if (!data._meta || !Array.isArray(data._meta) || !Array.isArray(data.mb_orders)) {
-    return {
-      ok: false,
-      errorMessage: "response shape invalid",
-      durationMs,
-    };
-  }
-  return { ok: true, data: data as SheetData, durationMs };
-}
-
-function okSnapshot(data: SheetData, durationMs: number): CachedSheet {
-  return {
-    ok: true,
-    fetchedAtIso: new Date().toISOString(),
-    fetchDurationMs: durationMs,
-    data,
-    metaAsOf: metaAsOfList(data._meta),
-  };
-}
-
-export async function refreshSheetNow(): Promise<CachedSheet> {
-  const result = await fetchSheetManual();
-  const now = new Date().toISOString();
-  if (result.ok) {
-    const snap = okSnapshot(result.data, result.durationMs);
-    await writeSnapshot(snap);
-    return snap;
-  }
-  const prev = await readSnapshot();
-  if (prev?.ok) {
-    const degraded: CachedSheet = {
-      ...prev,
-      errorMessage: result.errorMessage,
-    };
-    await writeSnapshot(degraded);
-    return degraded;
-  }
-  const failed: CachedSheet = {
-    ...emptyCachedSheet(false, result.errorMessage),
-    fetchedAtIso: now,
-    fetchDurationMs: result.durationMs,
-  };
-  await writeSnapshot(failed);
-  return failed;
-}
-
-export async function refreshSheetInBackground(): Promise<void> {
-  const result = await fetchSheetBackground();
-  if (result.ok) {
-    await writeSnapshot(okSnapshot(result.data, result.durationMs));
-    return;
-  }
-  const prev = await readSnapshot();
-  if (prev?.ok) {
-    await writeSnapshot({ ...prev, errorMessage: result.errorMessage });
-  } else {
-    await writeSnapshot({
-      ...emptyCachedSheet(false, result.errorMessage),
+      ok: true,
+      data: body,
+      errorMessage: null,
+      fetchDurationMs: Date.now() - t0,
       fetchedAtIso: new Date().toISOString(),
-      fetchDurationMs: result.durationMs,
-    });
+    };
+  } finally {
+    clearTimeout(timeoutId);
   }
-  console.warn(`[sheet] refresh failed: ${result.errorMessage}`);
 }
 
-export { staleReason, computeFreshness, todayIst } from "./freshness";
+// Page loads + background revalidation: Next.js in-memory data cache only.
+// 10 minutes of revalidation across warm lambda invocations.
+export async function fetchSheetCached(): Promise<SheetFetchResult> {
+  return fetchOnce({ next: { revalidate: 600 } });
+}
+
+// Manual refresh button: always hits the network.
+export async function fetchSheetFresh(): Promise<SheetFetchResult> {
+  return fetchOnce({ cache: "no-store" });
+}
