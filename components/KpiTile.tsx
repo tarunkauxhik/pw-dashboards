@@ -12,8 +12,13 @@ interface Props {
   delta?: Delta | null;
   hint?: string;
   emphasis?: "primary" | "secondary";
+  /**
+   * Either a formula string (renders a `FormulaInfo` icon in the top-right)
+   * or a custom ReactNode (e.g. a small toggle). Pass at most one.
+   */
   formula?: string;
   formulaNote?: string;
+  action?: React.ReactNode;
 }
 
 export function KpiTile({
@@ -24,6 +29,7 @@ export function KpiTile({
   emphasis = "primary",
   formula,
   formulaNote,
+  action,
 }: Props) {
   return (
     <div
@@ -36,12 +42,16 @@ export function KpiTile({
         <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
           {label}
         </div>
-        {formula && (
-          <FormulaInfo
-            formula={formula}
-            note={formulaNote}
-            className="shrink-0 pt-0.5"
-          />
+        {action !== undefined ? (
+          <div className="shrink-0">{action}</div>
+        ) : (
+          formula && (
+            <FormulaInfo
+              formula={formula}
+              note={formulaNote}
+              className="shrink-0 pt-0.5"
+            />
+          )
         )}
       </div>
       <div

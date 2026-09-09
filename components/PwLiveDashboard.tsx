@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { DashboardToolbar } from "./DashboardToolbar";
 import { KpiTile } from "./KpiTile";
 import { TrendSection } from "./TrendSection";
 import { SingleMetricChart } from "./SingleMetricChart";
+import { ViewModeToggle, type ViewMode } from "./ViewModeToggle";
 import { PwLiveBatchTable } from "./PwLiveBatchTable";
 import {
   funnelTotals,
@@ -111,6 +112,13 @@ export function PwLiveDashboard({ data, anchor }: Props) {
     () => perBatchPeriodTable(data.mb_pwlive_orders, anchor),
     [data.mb_pwlive_orders, anchor],
   );
+
+  // Per-tile display-only mode: doesn't affect formulas, conversion
+  // denominators, or any other calculation — purely a "which number to
+  // show in this tile" toggle. State is local + ephemeral (no
+  // persistence). Independent per tile.
+  const [batchViewMode, setBatchViewMode] = useState<ViewMode>("unique");
+  const [orderViewMode, setOrderViewMode] = useState<ViewMode>("unique");
 
   return (
     <DashboardToolbar
@@ -258,20 +266,56 @@ export function PwLiveDashboard({ data, anchor }: Props) {
             <SectionShell title="Headline KPIs">
               <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
                 <KpiTile
-                  label="Batch Page Views"
-                  value={intFmt(batchViews.totalViews)}
-                  delta={deltaStr(batchViews.totalViews, batchViewsPrior.totalViews)}
-                  formula="Σ mb_pwlive_funnel.total_views · batch_description_view"
-                  formulaNote={`${intFmt(batchViews.uniqueUsers)} unique users · repeats included in views`}
+                  label={
+                    batchViewMode === "overall"
+                      ? "Batch Page Views"
+                      : "Batch Page Unique Users"
+                  }
+                  value={intFmt(
+                    batchViewMode === "overall"
+                      ? batchViews.totalViews
+                      : batchViews.uniqueUsers,
+                  )}
+                  delta={deltaStr(
+                    batchViewMode === "overall"
+                      ? batchViews.totalViews
+                      : batchViews.uniqueUsers,
+                    batchViewMode === "overall"
+                      ? batchViewsPrior.totalViews
+                      : batchViewsPrior.uniqueUsers,
+                  )}
+                  action={
+                    <ViewModeToggle
+                      value={batchViewMode}
+                      onChange={setBatchViewMode}
+                    />
+                  }
                 />
                 <KpiTile
-                  label="Order Page Unique Users"
-                  value={intFmt(orderPageUsers.uniqueUsers)}
-                  delta={deltaStr(
-                    orderPageUsers.uniqueUsers,
-                    orderPageUsersPrior.uniqueUsers,
+                  label={
+                    orderViewMode === "overall"
+                      ? "Order Page Views"
+                      : "Order Page Unique Users"
+                  }
+                  value={intFmt(
+                    orderViewMode === "overall"
+                      ? orderPageUsers.totalViews
+                      : orderPageUsers.uniqueUsers,
                   )}
-                  formula="Σ mb_pwlive_funnel.unique_users · order_page_view"
+                  delta={deltaStr(
+                    orderViewMode === "overall"
+                      ? orderPageUsers.totalViews
+                      : orderPageUsers.uniqueUsers,
+                    orderViewMode === "overall"
+                      ? orderPageUsersPrior.totalViews
+                      : orderPageUsersPrior.uniqueUsers,
+                  )}
+                  action={
+                    <ViewModeToggle
+                      value={orderViewMode}
+                      onChange={setOrderViewMode}
+                    />
+                  }
                 />
                 <KpiTile
                   label={
