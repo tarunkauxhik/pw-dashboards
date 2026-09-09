@@ -1,4 +1,5 @@
 import type { MetaRow } from "@/types/sheet";
+import { addDaysIst } from "./dateRanges";
 
 export interface FreshnessInput {
   ok: boolean;
@@ -26,16 +27,6 @@ function todayIstIso(now: Date = new Date()): string {
   const m = parts.find((p) => p.type === "month")?.value;
   const d = parts.find((p) => p.type === "day")?.value;
   return `${y}-${m}-${d}`;
-}
-
-function addDaysIst(iso: string, n: number): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  dt.setUTCDate(dt.getUTCDate() + n);
-  const yy = dt.getUTCFullYear();
-  const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(dt.getUTCDate()).padStart(2, "0");
-  return `${yy}-${mm}-${dd}`;
 }
 
 export interface Freshness {

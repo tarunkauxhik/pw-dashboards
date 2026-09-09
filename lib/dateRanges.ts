@@ -84,3 +84,69 @@ export function monthKey(isoDate: string): string {
 export function dayKey(isoDate: string): string {
   return isoDate;
 }
+
+/**
+ * Indian financial year label. FY 25-26 = Apr 2025 → Mar 2026.
+ * Returns a `YYYY-YY` string (e.g. "FY 25-26"). Months Apr-Dec belong
+ * to the next year's FY; Jan-Mar to the previous calendar year's FY.
+ */
+export function fyLabel(isoDate: string): string {
+  const [y, m] = isoDate.split("-").map(Number);
+  const fyStartYear = m >= 4 ? y : y - 1;
+  const fyEndShort = String((fyStartYear + 1) % 100).padStart(2, "0");
+  return `FY ${String(fyStartYear).slice(-2)}-${fyEndShort}`;
+}
+
+export function fyStartDate(fyStartYear: number): string {
+  return `${fyStartYear}-04-01`;
+}
+
+export function fyEndDate(fyStartYear: number): string {
+  return `${fyStartYear + 1}-03-31`;
+}
+
+export function fyRange(fyStartYear: number): DateRange {
+  return { from: fyStartDate(fyStartYear), to: fyEndDate(fyStartYear) };
+}
+
+/**
+ * Distinct FYs present in the orders. Returns an ascending list of
+ * FY start years (4-digit integers) — e.g. [2024, 2025, 2026].
+ */
+export function distinctFYs<T extends { order_date_ist: string }>(
+  rows: T[],
+): number[] {
+  const set = new Set<number>();
+  for (const r of rows) {
+    const [y, m] = r.order_date_ist.split("-").map(Number);
+    if (Number.isNaN(y) || Number.isNaN(m)) continue;
+    const fyStartYear = m >= 4 ? y : y - 1;
+    set.add(fyStartYear);
+  }
+  return [...set].sort((a, b) => a - b);
+}
+
+/**
+ * Distinct calendar months present in the orders. Returns a sorted
+ * list of `YYYY-MM` strings (e.g. ["2025-08","2025-09","2026-01"]).
+ */
+export function distinctMonths<T extends { order_date_ist: string }>(
+  rows: T[],
+): string[] {
+  const set = new Set<string>();
+  for (const r of rows) {
+    const key = r.order_date_ist.slice(0, 7);
+    if (key.length === 7) set.add(key);
+  }
+  return [...set].sort();
+}
+
+export function addDaysIst(iso: string, n: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + n);
+  const yy = dt.getUTCFullYear();
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getUTCDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}

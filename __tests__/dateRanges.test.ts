@@ -1,6 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
+  addDaysIst,
   dayKey,
+  distinctFYs,
+  distinctMonths,
+  fyEndDate,
+  fyLabel,
+  fyRange,
+  fyStartDate,
   getAnchorDate,
   isoWeekKey,
   monthKey,
@@ -93,5 +100,54 @@ describe("monthKey / dayKey", () => {
   });
   it("echoes day", () => {
     expect(dayKey("2026-09-08")).toBe("2026-09-08");
+  });
+});
+
+describe("addDaysIst", () => {
+  it("adds days across a month boundary", () => {
+    expect(addDaysIst("2026-08-30", 3)).toBe("2026-09-02");
+  });
+  it("subtracts days with negative n", () => {
+    expect(addDaysIst("2026-09-02", -3)).toBe("2026-08-30");
+  });
+});
+
+describe("fyLabel / fyRange / distinctFYs / distinctMonths", () => {
+  it("FY 25-26 covers Apr 2025 → Mar 2026", () => {
+    expect(fyLabel("2025-04-01")).toBe("FY 25-26");
+    expect(fyLabel("2025-12-31")).toBe("FY 25-26");
+    expect(fyLabel("2026-01-01")).toBe("FY 25-26");
+    expect(fyLabel("2026-03-31")).toBe("FY 25-26");
+    expect(fyLabel("2026-04-01")).toBe("FY 26-27");
+    expect(fyLabel("2024-04-15")).toBe("FY 24-25");
+  });
+  it("fyStartDate / fyEndDate span Apr-Mar", () => {
+    expect(fyStartDate(2025)).toBe("2025-04-01");
+    expect(fyEndDate(2025)).toBe("2026-03-31");
+  });
+  it("fyRange returns the correct window", () => {
+    expect(fyRange(2025)).toEqual({
+      from: "2025-04-01",
+      to: "2026-03-31",
+    });
+  });
+  it("distinctFYs collects unique start years", () => {
+    const rows = [
+      { order_date_ist: "2024-06-01" }, // FY 24-25
+      { order_date_ist: "2025-01-01" }, // FY 24-25
+      { order_date_ist: "2025-06-01" }, // FY 25-26
+      { order_date_ist: "2026-02-01" }, // FY 25-26
+      { order_date_ist: "2026-09-09" }, // FY 26-27
+    ];
+    expect(distinctFYs(rows)).toEqual([2024, 2025, 2026]);
+  });
+  it("distinctMonths collects unique YYYY-MM in order", () => {
+    const rows = [
+      { order_date_ist: "2025-08-15" },
+      { order_date_ist: "2025-09-03" },
+      { order_date_ist: "2025-08-30" },
+      { order_date_ist: "2026-01-05" },
+    ];
+    expect(distinctMonths(rows)).toEqual(["2025-08", "2025-09", "2026-01"]);
   });
 });
