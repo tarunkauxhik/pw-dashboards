@@ -13,7 +13,12 @@ export function DashboardShell({
   title: string;
   subtitle: string;
   statusBar?: ReactNode;
-  sidebarMeta?: { lastRefreshedIso: string | null; stale: StaleReason };
+  sidebarMeta?: {
+    lastRefreshedIso: string | null;
+    stale: StaleReason;
+    sourceFailed: boolean;
+    isBehindSchedule: boolean;
+  };
   children: ReactNode;
 }) {
   return (
@@ -21,6 +26,8 @@ export function DashboardShell({
       <Sidebar
         lastRefreshedIso={sidebarMeta?.lastRefreshedIso ?? null}
         stale={sidebarMeta?.stale ?? "never-fetched"}
+        sourceFailed={sidebarMeta?.sourceFailed ?? false}
+        isBehindSchedule={sidebarMeta?.isBehindSchedule ?? false}
       />
       <main className="flex-1 md:pl-[240px]">
         <div className="mx-auto w-full max-w-[1400px] space-y-6 p-6 md:p-8">

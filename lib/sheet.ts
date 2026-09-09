@@ -68,11 +68,10 @@ function metaAsOfList(meta: MetaRow[]): string[] {
   return [...new Set(meta.map((m) => m.data_as_of_ist.slice(0, 10)))].sort();
 }
 
-async function fetchSheetOnce(): Promise<{
-  ok: true;
-  data: SheetData;
-  durationMs: number;
-} | { ok: false; errorMessage: string; durationMs: number }> {
+async function fetchSheetManual(): Promise<
+  | { ok: true; data: SheetData; durationMs: number }
+  | { ok: false; errorMessage: string; durationMs: number }
+> {
   const url = `${process.env.SHEET_API_URL}?token=${process.env.SHEET_API_TOKEN}`;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -82,44 +81,71 @@ async function fetchSheetOnce(): Promise<{
       cache: "no-store",
       signal: controller.signal,
     });
-    if (!res.ok) {
-      return {
-        ok: false,
-        errorMessage: `Sheet API returned ${res.status}`,
-        durationMs: Date.now() - t0,
-      };
-    }
-    const data = (await res.json()) as { error?: string } & Partial<SheetData>;
-    if (data.error) {
-      return {
-        ok: false,
-        errorMessage: `Sheet API: ${data.error}`,
-        durationMs: Date.now() - t0,
-      };
-    }
-    if (!data._meta || !Array.isArray(data._meta) || !Array.isArray(data.mb_orders)) {
-      return {
-        ok: false,
-        errorMessage: "response shape invalid",
-        durationMs: Date.now() - t0,
-      };
-    }
-    return {
-      ok: true,
-      data: data as SheetData,
-      durationMs: Date.now() - t0,
-    };
-  } catch (err) {
-    const msg =
-      err instanceof Error
-        ? err.name === "AbortError"
-          ? `timed out after ${FETCH_TIMEOUT_MS / 1000}s`
-          : err.message
-        : "unknown error";
-    return { ok: false, errorMessage: msg, durationMs: Date.now() - t0 };
+    return await parseSheetResponse(res, Date.now() - t0);
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+async function fetchSheetBackground(): Promise<
+  | { ok: true; data: SheetData; durationMs: number }
+  | { ok: false; errorMessage: string; durationMs: number }
+> {
+  const url = `${process.env.SHEET_API_URL}?token=${process.env.SHEET_API_TOKEN}`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const t0 = Date.now();
+  try {
+    // No cache directive: our disk snapshot is the single source of caching.
+    const res = await fetch(url, {
+      signal: controller.signal,
+    });
+    return await parseSheetResponse(res, Date.now() - t0);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function parseSheetResponse(
+  res: Response,
+  durationMs: number,
+): Promise<
+  | { ok: true; data: SheetData; durationMs: number }
+  | { ok: false; errorMessage: string; durationMs: number }
+> {
+  if (!res.ok) {
+    return {
+      ok: false,
+      errorMessage: `Sheet API returned ${res.status}`,
+      durationMs,
+    };
+  }
+  let data: { error?: string } & Partial<SheetData>;
+  try {
+    data = (await res.json()) as { error?: string } & Partial<SheetData>;
+  } catch (err) {
+    return {
+      ok: false,
+      errorMessage:
+        err instanceof Error ? `invalid JSON: ${err.message}` : "invalid JSON",
+      durationMs,
+    };
+  }
+  if (data.error) {
+    return {
+      ok: false,
+      errorMessage: `Sheet API: ${data.error}`,
+      durationMs,
+    };
+  }
+  if (!data._meta || !Array.isArray(data._meta) || !Array.isArray(data.mb_orders)) {
+    return {
+      ok: false,
+      errorMessage: "response shape invalid",
+      durationMs,
+    };
+  }
+  return { ok: true, data: data as SheetData, durationMs };
 }
 
 function okSnapshot(data: SheetData, durationMs: number): CachedSheet {
@@ -133,7 +159,7 @@ function okSnapshot(data: SheetData, durationMs: number): CachedSheet {
 }
 
 export async function refreshSheetNow(): Promise<CachedSheet> {
-  const result = await fetchSheetOnce();
+  const result = await fetchSheetManual();
   const now = new Date().toISOString();
   if (result.ok) {
     const snap = okSnapshot(result.data, result.durationMs);
@@ -159,7 +185,7 @@ export async function refreshSheetNow(): Promise<CachedSheet> {
 }
 
 export async function refreshSheetInBackground(): Promise<void> {
-  const result = await fetchSheetOnce();
+  const result = await fetchSheetBackground();
   if (result.ok) {
     await writeSnapshot(okSnapshot(result.data, result.durationMs));
     return;
@@ -177,4 +203,4 @@ export async function refreshSheetInBackground(): Promise<void> {
   console.warn(`[sheet] refresh failed: ${result.errorMessage}`);
 }
 
-export { staleReason, isAnchoredToYesterday } from "./freshness";
+export { staleReason, computeFreshness, todayIst } from "./freshness";

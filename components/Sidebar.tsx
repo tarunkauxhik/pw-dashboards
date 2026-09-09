@@ -33,9 +33,13 @@ const STALE_LABEL: Record<
 export function Sidebar({
   lastRefreshedIso,
   stale,
+  sourceFailed,
+  isBehindSchedule,
 }: {
   lastRefreshedIso: string | null;
   stale: StaleReason;
+  sourceFailed: boolean;
+  isBehindSchedule: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -70,7 +74,13 @@ export function Sidebar({
 
   void tickNow;
 
-  const meta = STALE_LABEL[stale];
+  // Sidebar dot reflects the worst freshness condition. The detailed
+  // reasons get surfaced in the main StatusBar next to the page title.
+  const meta = sourceFailed
+    ? { text: "API reported issues", tone: "warn" as const }
+    : isBehindSchedule
+      ? { text: "Behind schedule", tone: "warn" as const }
+      : STALE_LABEL[stale];
   const dotClass =
     meta.tone === "ok"
       ? "bg-emerald-500"

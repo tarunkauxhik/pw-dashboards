@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { DashboardToolbar } from "./DashboardToolbar";
 import { KpiTile } from "./KpiTile";
 import { TrendSection } from "./TrendSection";
@@ -25,28 +26,43 @@ import {
 } from "@/lib/filters";
 import { priorPeriod, resolvePeriod } from "@/lib/dateRanges";
 import { deltaStr, inr, intFmt, pct } from "@/lib/format";
-import type { SheetData } from "@/types/sheet";
+import type { OrderRow, SheetData } from "@/types/sheet";
 
 interface Props {
   data: SheetData;
   anchor: string;
 }
 
+const DEFAULT_EXCLUDED = ["ADMIN", "PW_PLAN"];
+
+function distinctSources(orders: OrderRow[]): string[] {
+  return [...new Set(orders.map((o) => o.source))].sort();
+}
+
+function applySourceFilter(
+  orders: OrderRow[],
+  includeSources: Set<string>,
+): OrderRow[] {
+  if (includeSources.size === 0) return orders;
+  return orders.filter((o) => includeSources.has(o.source));
+}
+
 export function BusinessDashboard({ data, anchor }: Props) {
+  const sources = useMemo(() => distinctSources(data.mb_orders), [data.mb_orders]);
+
   return (
-    <DashboardToolbar>
+    <DashboardToolbar
+      sourceOptions={sources}
+      defaultExcluded={DEFAULT_EXCLUDED}
+    >
       {(ctx) => {
         const range = resolvePeriod(ctx.period, anchor);
         const prior = priorPeriod(range);
 
-        const ordersAll = filterRevenueOrders(
-          byOrderDateRange(data.mb_orders, range),
-          ctx.includeAdmin,
-        );
-        const ordersPrior = filterRevenueOrders(
-          byOrderDateRange(data.mb_orders, prior),
-          ctx.includeAdmin,
-        );
+        const ordersRangeAll = byOrderDateRange(data.mb_orders, range);
+        const ordersRange = applySourceFilter(ordersRangeAll, ctx.includeSources);
+        const ordersPriorAll = byOrderDateRange(data.mb_orders, prior);
+        const ordersPrior = applySourceFilter(ordersPriorAll, ctx.includeSources);
         const signupsRange = byDateRange(data.mb_signups_daily, range);
         const signupsPrior = byDateRange(data.mb_signups_daily, prior);
         const afRange = byAfDateRange(data.af_daily, range);
@@ -54,8 +70,8 @@ export function BusinessDashboard({ data, anchor }: Props) {
 
         const collection =
           ctx.grossNet === "gross"
-            ? grossCollection(ordersAll)
-            : netCollection(ordersAll);
+            ? grossCollection(ordersRange)
+            : netCollection(ordersRange);
         const priorCollection =
           ctx.grossNet === "gross"
             ? grossCollection(ordersPrior)
@@ -67,15 +83,19 @@ export function BusinessDashboard({ data, anchor }: Props) {
         const installs = afRange.reduce((s, r) => s + r.installs, 0);
         const priorInstalls = afPrior.reduce((s, r) => s + r.installs, 0);
 
-        const payers = paidUsers(ordersAll);
+        const payers = paidUsers(ordersRange);
         const priorPayers = paidUsers(ordersPrior);
 
-        const arpuVal = payers === 0 ? 0 : grossCollection(ordersAll) / payers;
+        const arpuVal =
+          payers === 0 ? 0 : grossCollection(ordersRange) / payers;
         const priorArpu =
           priorPayers === 0 ? 0 : grossCollection(ordersPrior) / priorPayers;
 
+        // Conv uses period-filtered SIGNUPS vs period-filtered PAYERS.
+        // Conversion is intentionally based on orders that match the user's
+        // source selection (so the headline reflects what they see in Collection).
         const conv = conversionRate(
-          ordersAll,
+          ordersRange,
           data.mb_signups_daily,
           range.from,
           range.to,
@@ -88,7 +108,9 @@ export function BusinessDashboard({ data, anchor }: Props) {
         );
 
         const aov =
-          ordersAll.length === 0 ? 0 : grossCollection(ordersAll) / ordersAll.length;
+          ordersRange.length === 0
+            ? 0
+            : grossCollection(ordersRange) / ordersRange.length;
         const priorAov =
           ordersPrior.length === 0
             ? 0
@@ -116,7 +138,9 @@ export function BusinessDashboard({ data, anchor }: Props) {
                   }
                   value={inr(collection)}
                   delta={deltaStr(collection, priorCollection)}
-                  hint="Net = Gross / 1.18"
+                  hint={
+                    ctx.grossNet === "net" ? "Net = Gross / 1.18" : undefined
+                  }
                 />
                 <KpiTile
                   label="Paid Users"
@@ -142,12 +166,12 @@ export function BusinessDashboard({ data, anchor }: Props) {
                 <KpiTile
                   emphasis="secondary"
                   label="Discount Given"
-                  value={inr(discountGiven(ordersAll))}
+                  value={inr(discountGiven(ordersRange))}
                 />
                 <KpiTile
                   emphasis="secondary"
                   label="List Value"
-                  value={inr(listValue(ordersAll))}
+                  value={inr(listValue(ordersRange))}
                   hint="price + coupon_discount"
                 />
                 <KpiTile
@@ -170,21 +194,21 @@ export function BusinessDashboard({ data, anchor }: Props) {
                 label="MoM — Month"
                 grouping="month"
                 range={range}
-                orders={ordersAll}
+                orders={ordersRange}
                 signupsForConversion={totalSignups}
               />
               <TrendSection
                 label="WoW — ISO Week (Mon-start)"
                 grouping="week"
                 range={range}
-                orders={ordersAll}
+                orders={ordersRange}
                 signupsForConversion={totalSignups}
               />
               <TrendSection
                 label="Last 7 Days"
                 grouping="day"
                 range={range}
-                orders={ordersAll}
+                orders={ordersRange}
                 signupsForConversion={totalSignups}
               />
             </div>
@@ -195,10 +219,10 @@ export function BusinessDashboard({ data, anchor }: Props) {
 
             <Section title="Revenue Breakdown">
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                <PlatformRevenueChart data={revenueByPlatform(ordersAll)} />
+                <PlatformRevenueChart data={revenueByPlatform(ordersRange)} />
                 <GatewayRevenueChart
                   data={Object.entries(
-                    ordersAll.reduce<Record<string, number>>((acc, o) => {
+                    ordersRange.reduce<Record<string, number>>((acc, o) => {
                       const key = `${o.gateway} · ${o.payment_method}`;
                       acc[key] = (acc[key] ?? 0) + o.price;
                       return acc;
@@ -208,7 +232,7 @@ export function BusinessDashboard({ data, anchor }: Props) {
                     .sort((a, b) => b.revenue - a.revenue)
                     .slice(0, 8)}
                 />
-                <TopCouponsTable orders={ordersAll} />
+                <TopCouponsTable orders={ordersRange} />
               </div>
             </Section>
           </div>

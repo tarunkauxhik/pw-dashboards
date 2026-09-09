@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { DashboardToolbar } from "./DashboardToolbar";
 import { KpiTile } from "./KpiTile";
 import { ChannelTable } from "./ChannelTable";
@@ -7,8 +8,6 @@ import { RevenueByChannelChart } from "./RevenueByChannelChart";
 import { InstallsCostTrend } from "./InstallsCostTrend";
 import {
   cac,
-  filterRevenueOrders,
-  grossCollection,
   paidUsers,
   revenueByChannel,
 } from "@/lib/metrics";
@@ -19,27 +18,46 @@ import {
 import { channelCoverage } from "@/lib/channel";
 import { priorPeriod, resolvePeriod } from "@/lib/dateRanges";
 import { deltaStr, inr, intFmt } from "@/lib/format";
-import type { SheetData } from "@/types/sheet";
+import type { OrderRow, SheetData } from "@/types/sheet";
 
 interface Props {
   data: SheetData;
   anchor: string;
 }
 
+const DEFAULT_EXCLUDED = ["ADMIN", "PW_PLAN"];
+
+function distinctSources(orders: OrderRow[]): string[] {
+  return [...new Set(orders.map((o) => o.source))].sort();
+}
+
+function applySourceFilter(
+  orders: OrderRow[],
+  includeSources: Set<string>,
+): OrderRow[] {
+  if (includeSources.size === 0) return orders;
+  return orders.filter((o) => includeSources.has(o.source));
+}
+
 export function MarketingDashboard({ data, anchor }: Props) {
+  const sources = useMemo(() => distinctSources(data.mb_orders), [data.mb_orders]);
+
   return (
-    <DashboardToolbar>
+    <DashboardToolbar
+      sourceOptions={sources}
+      defaultExcluded={DEFAULT_EXCLUDED}
+    >
       {(ctx) => {
         const range = resolvePeriod(ctx.period, anchor);
         const prior = priorPeriod(range);
 
-        const orders = filterRevenueOrders(
+        const ordersRange = applySourceFilter(
           byOrderDateRange(data.mb_orders, range),
-          ctx.includeAdmin,
+          ctx.includeSources,
         );
-        const ordersPrior = filterRevenueOrders(
+        const ordersPrior = applySourceFilter(
           byOrderDateRange(data.mb_orders, prior),
-          ctx.includeAdmin,
+          ctx.includeSources,
         );
         const af = byAfDateRange(data.af_daily, range);
         const afPrior = byAfDateRange(data.af_daily, prior);
@@ -49,15 +67,15 @@ export function MarketingDashboard({ data, anchor }: Props) {
         const cost = af.reduce((s, r) => s + r.cost_inr, 0);
         const priorCost = afPrior.reduce((s, r) => s + r.cost_inr, 0);
 
-        const cacVal = cac(orders, af);
+        const cacVal = cac(ordersRange, af);
         const priorCacVal = cac(ordersPrior, afPrior);
 
-        const payers = paidUsers(orders);
+        const payers = paidUsers(ordersRange);
         const priorPayers = paidUsers(ordersPrior);
 
-        const channels = revenueByChannel(orders, data.mb_paid_user_attribution);
+        const channels = revenueByChannel(ordersRange, data.mb_paid_user_attribution);
         const coverage = channelCoverage(
-          orders.map((o) => o.userid),
+          ordersRange.map((o) => o.userid),
           data.mb_paid_user_attribution,
         );
 

@@ -3,18 +3,24 @@
 import { useMemo, useState } from "react";
 import { PeriodSelector, type PeriodKind } from "./PeriodSelector";
 import { GrossNetToggle, type GrossNet } from "./GrossNetToggle";
-import { IncludeAdminToggle } from "./IncludeAdminToggle";
+import { SourceMultiSelect } from "./SourceMultiSelect";
 import type { Period } from "@/lib/dateRanges";
 
 interface Props {
+  sourceOptions: string[];
+  defaultExcluded: string[];
   children: (ctx: {
     period: Period;
     grossNet: GrossNet;
-    includeAdmin: boolean;
+    includeSources: Set<string>;
   }) => React.ReactNode;
 }
 
-export function DashboardToolbar({ children }: Props) {
+export function DashboardToolbar({
+  sourceOptions,
+  defaultExcluded,
+  children,
+}: Props) {
   const [periodKind, setPeriodKind] = useState<PeriodKind>("last30");
   const period: Period = useMemo(
     () =>
@@ -26,11 +32,21 @@ export function DashboardToolbar({ children }: Props) {
     [periodKind],
   );
   const [grossNet, setGrossNet] = useState<GrossNet>("gross");
-  const [includeAdmin, setIncludeAdmin] = useState(false);
+  const initiallyExcluded = useMemo(
+    () => new Set(sourceOptions.filter((s) => defaultExcluded.includes(s))),
+    [sourceOptions, defaultExcluded],
+  );
+  const [excludedSources, setExcludedSources] =
+    useState<Set<string>>(initiallyExcluded);
+  const includeSources = useMemo(() => {
+    const out = new Set<string>();
+    for (const s of sourceOptions) if (!excludedSources.has(s)) out.add(s);
+    return out;
+  }, [sourceOptions, excludedSources]);
 
   const ctx = useMemo(
-    () => ({ period, grossNet, includeAdmin }),
-    [period, grossNet, includeAdmin],
+    () => ({ period, grossNet, includeSources }),
+    [period, grossNet, includeSources],
   );
 
   return (
@@ -39,9 +55,10 @@ export function DashboardToolbar({ children }: Props) {
         <PeriodSelector value={periodKind} onChange={setPeriodKind} />
         <div className="flex items-center gap-4">
           <GrossNetToggle value={grossNet} onChange={setGrossNet} />
-          <IncludeAdminToggle
-            checked={includeAdmin}
-            onChange={setIncludeAdmin}
+          <SourceMultiSelect
+            options={sourceOptions}
+            excluded={excludedSources}
+            onChange={setExcludedSources}
           />
         </div>
       </div>
