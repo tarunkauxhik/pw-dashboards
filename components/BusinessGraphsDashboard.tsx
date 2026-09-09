@@ -255,11 +255,12 @@ function GraphsInner({
     });
   }, [baseOrdersAll, fySelection, grossNet]);
 
-  // WoW data — filtered by selected months
+  // WoW data — filtered by selected months. Empty selection means
+  // "show nothing" (consistent with the picker showing 0 chips active).
   const wowData = useMemo(() => {
     const filtered =
       monthSelection.size === 0
-        ? baseOrdersAll
+        ? []
         : baseOrdersAll.filter((o) =>
             monthSelection.has(o.order_date_ist.slice(0, 7)),
           );
