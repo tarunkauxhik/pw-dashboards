@@ -15,6 +15,7 @@ import type { StaleReason } from "@/lib/sheet";
 
 const NAV = [
   { href: "/business", label: "Business", icon: Gauge },
+  { href: "/business-graphs", label: "Business Graphs", icon: BarChart3 },
   { href: "/marketing", label: "Marketing", icon: BarChart3 },
   { href: "/push", label: "Push", icon: Megaphone },
 ] as const;
