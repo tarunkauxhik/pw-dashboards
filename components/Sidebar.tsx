@@ -32,12 +32,14 @@ export function Sidebar() {
       <nav className="flex flex-1 flex-col gap-0.5 p-3">
         {NAV.map((item) => {
           const active =
-            pathname === item.href || pathname.startsWith(item.href + "/");
+            pathname === item.href ||
+            (pathname?.startsWith(item.href + "/") ?? false);
           const Icon = item.icon;
           return (
             <Link
               key={item.href}
               href={item.href}
+              prefetch
               className={cn(
                 "flex h-9 items-center gap-2.5 rounded-md px-3 text-sm transition-colors duration-200",
                 active
