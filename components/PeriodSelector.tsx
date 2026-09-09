@@ -72,85 +72,117 @@ export function PeriodSelector({
         Prev Month
       </QuickButton>
 
-      <DropdownTrigger
-        active={value.kind === "month"}
-        open={open === "month"}
-        label="Month"
-        valueLabel={
-          value.kind === "month" ? humanMonth(value.ym) : "Select month"
-        }
-        onClick={() => setOpen(open === "month" ? null : "month")}
-      />
-      <DropdownTrigger
-        active={value.kind === "ytd"}
-        open={open === "ytd"}
-        label="YTD"
-        valueLabel={
-          value.kind === "ytd"
-            ? `FY ${String(value.fyStartYear).slice(-2)}-${String((value.fyStartYear + 1) % 100).padStart(2, "0")}`
-            : "Select FY"
-        }
-        onClick={() => setOpen(open === "ytd" ? null : "ytd")}
-      />
-      <DropdownTrigger
-        active={value.kind === "custom"}
-        open={open === "custom"}
-        label="Custom"
-        valueLabel={
-          value.kind === "custom"
-            ? `${value.from} → ${value.to}`
-            : "Pick dates"
-        }
-        onClick={() => setOpen(open === "custom" ? null : "custom")}
-      />
+      <div className="relative">
+        <DropdownTrigger
+          active={value.kind === "month"}
+          open={open === "month"}
+          label="Month"
+          valueLabel={
+            value.kind === "month" ? humanMonth(value.ym) : "Select month"
+          }
+          onClick={() => setOpen(open === "month" ? null : "month")}
+        />
+        {open === "month" && (
+          <div className="absolute left-0 top-full z-50 mt-2 w-[280px] rounded-md border border-border/60 bg-popover p-3 text-foreground shadow-lg">
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setOpen(null)}
+                className="text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground"
+              >
+                Close
+              </button>
+            </div>
+            <MonthPicker
+              options={monthOptions}
+              current={value.kind === "month" ? value.ym : undefined}
+              anchor={anchor}
+              onPick={(ym) => {
+                onChange({ kind: "month", ym });
+                setOpen(null);
+              }}
+            />
+          </div>
+        )}
+      </div>
 
-      {open === "month" && (
-        <Popover onClose={() => setOpen(null)}>
-          <MonthPicker
-            options={monthOptions}
-            current={value.kind === "month" ? value.ym : undefined}
-            anchor={anchor}
-            onPick={(ym) => {
-              onChange({ kind: "month", ym });
-              setOpen(null);
-            }}
-          />
-        </Popover>
-      )}
+      <div className="relative">
+        <DropdownTrigger
+          active={value.kind === "ytd"}
+          open={open === "ytd"}
+          label="YTD"
+          valueLabel={
+            value.kind === "ytd"
+              ? `FY ${String(value.fyStartYear).slice(-2)}-${String((value.fyStartYear + 1) % 100).padStart(2, "0")}`
+              : "Select FY"
+          }
+          onClick={() => setOpen(open === "ytd" ? null : "ytd")}
+        />
+        {open === "ytd" && (
+          <div className="absolute left-0 top-full z-50 mt-2 w-[280px] rounded-md border border-border/60 bg-popover p-3 text-foreground shadow-lg">
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setOpen(null)}
+                className="text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground"
+              >
+                Close
+              </button>
+            </div>
+            <YTDPicker
+              options={fyOptions}
+              current={value.kind === "ytd" ? value.fyStartYear : undefined}
+              onPick={(fyStartYear) => {
+                onChange({ kind: "ytd", fyStartYear });
+                setOpen(null);
+              }}
+            />
+          </div>
+        )}
+      </div>
 
-      {open === "ytd" && (
-        <Popover onClose={() => setOpen(null)}>
-          <YTDPicker
-            options={fyOptions}
-            current={value.kind === "ytd" ? value.fyStartYear : undefined}
-            onPick={(fyStartYear) => {
-              onChange({ kind: "ytd", fyStartYear });
-              setOpen(null);
-            }}
-          />
-        </Popover>
-      )}
-
-      {open === "custom" && (
-        <Popover onClose={() => setOpen(null)}>
-          <CustomRangePicker
-            anchor={anchor}
-            current={
-              value.kind === "custom" ? { from: value.from, to: value.to } : null
-            }
-            minDate={
-              monthOptions.length > 0
-                ? `${monthOptions[0]}-01`
-                : undefined
-            }
-            onApply={(from, to) => {
-              if (from > to) return;
-              onChange({ kind: "custom", from, to });
-              setOpen(null);
-            }}
-          />
-        </Popover>
-      )}
+      <div className="relative">
+        <DropdownTrigger
+          active={value.kind === "custom"}
+          open={open === "custom"}
+          label="Custom"
+          valueLabel={
+            value.kind === "custom"
+              ? `${value.from} → ${value.to}`
+              : "Pick dates"
+          }
+          onClick={() => setOpen(open === "custom" ? null : "custom")}
+        />
+        {open === "custom" && (
+          <div className="absolute left-0 top-full z-50 mt-2 w-[300px] rounded-md border border-border/60 bg-popover p-3 text-foreground shadow-lg">
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setOpen(null)}
+                className="text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground"
+              >
+                Close
+              </button>
+            </div>
+            <CustomRangePicker
+              anchor={anchor}
+              current={
+                value.kind === "custom" ? { from: value.from, to: value.to } : null
+              }
+              minDate={
+                monthOptions.length > 0
+                  ? `${monthOptions[0]}-01`
+                  : undefined
+              }
+              onApply={(from, to) => {
+                if (from > to) return;
+                onChange({ kind: "custom", from, to });
+                setOpen(null);
+              }}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -217,32 +249,6 @@ function DropdownTrigger({
         )}
       />
     </button>
-  );
-}
-
-function Popover({
-  children,
-  onClose,
-}: {
-  children: React.ReactNode;
-  onClose: () => void;
-}) {
-  return (
-    <div
-      role="dialog"
-      className="absolute left-0 top-full z-50 mt-2 w-[280px] rounded-md border border-border/60 bg-popover p-3 text-foreground shadow-lg"
-    >
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground"
-        >
-          Close
-        </button>
-      </div>
-      {children}
-    </div>
   );
 }
 
